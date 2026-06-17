@@ -4,6 +4,7 @@ store.json
 data/
 .env
 .env.*
+!.env.example
 # Phase 2 SQLite store + WAL sidecars (local/Fly-volume data — never publish)
 *.db
 *.db-shm

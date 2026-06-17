@@ -108,9 +108,17 @@ size bound.
    wired to the store; bearer-token auth middleware on `/mcp`. HTTP smoke (SDK client over the wire)
    proves version-mismatch + over-cap rejections, the 401 gate, list-leaks-no-text. 8 tests green.
    Files: src/mcp.ts, src/app.ts, src/server-http.ts, test/http.test.ts.
-3. **Google sign-in** (human path) + account creation: on signup, seed sticky 1 from the posted
-   localStorage draft + onboarding blurb, mark it shared. Verify end-to-end: sign in → 10 slots →
-   sticky 1 shared.
+3. **[DONE]** Google sign-in (human path) + account creation. `account` table (user_id, google_sub
+   unique, email, onboarded). `findOrCreateAccount(sub, {email,draft})`: first sign-in creates the
+   account + seeds sticky 1 = draft + onboarding blurb (composeSeed cap-guards: blurb survives
+   whole, draft yields), marked shared (default at t=0); returning user gets account back, NO
+   re-seed (blurb never re-injects — guarded by `onboarded`). `POST /auth/google` route with a
+   `verifyGoogleToken` SEAM (injectable; real impl in server-http.ts verifies the Google ID-token
+   JWT vs Google JWKS via `jose`, checks iss+aud, only wired when GOOGLE_CLIENT_ID set else 501).
+   8 tests (seed, no-re-seed, cap-guard, route 200/401/400/501). NOTE: returns user_id for now;
+   real session cookie/web-token lands with the PWA (step 5). Connector still uses the bearer token.
+   Two step-2 hardening notes also folded in: constant-time token compare (sha256+timingSafeEqual)
+   and the stateless cleanup confirmed (per-request server GC'd; no explicit close for JSON tools).
 4. **AEAD-at-rest** on text/prev_text (key-id + rotation); round-trip test.
 5. **Web UI**: stack of 10, free-text editing, **live char counter**, interactive **shared-prompt
    lozenge** (click to flip). Public landing sticky + save CTA (localStorage → POST on auth).

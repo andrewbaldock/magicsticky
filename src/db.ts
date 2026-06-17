@@ -63,6 +63,23 @@ export interface StickyMeta {
   is_shared: boolean;
 }
 
+export interface Account {
+  user_id: string;
+  google_sub: string;
+  email: string | null;
+  onboarded: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// The onboarding blurb appended to sticky 1 on first signup. Plain text (a sticky is not rich
+// text). Deletable by the user; never re-injected (guarded by account.onboarded).
+export const ONBOARDING_BLURB =
+  "—\n" +
+  "👋 This is your shared prompt — the note every Claude you talk to can read.\n" +
+  "Install the Magic Sticky connector in Claude, then just say \"check my sticky\" to start.\n" +
+  "Edit or delete this freely — it's your note.";
+
 interface Row {
   id: string;
   user_id: string;
@@ -111,6 +128,17 @@ export class Store {
       CREATE UNIQUE INDEX IF NOT EXISTS one_shared_per_user
         ON sticky(user_id) WHERE is_shared = 1;
       CREATE INDEX IF NOT EXISTS sticky_user_pos ON sticky(user_id, position);
+
+      -- one row per signed-in human. google_sub is the stable Google account id (the OIDC 'sub').
+      -- onboarded marks that sticky 1 was seeded once, so re-auth never re-injects the blurb.
+      CREATE TABLE IF NOT EXISTS account (
+        user_id     TEXT PRIMARY KEY,
+        google_sub  TEXT NOT NULL UNIQUE,
+        email       TEXT,
+        onboarded   INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
     `);
   }
 
@@ -232,4 +260,62 @@ export class Store {
     });
     return tx() ? this.getShared(userId) : null;
   }
+
+  getAccountByGoogleSub(googleSub: string): Account | null {
+    const r = this.db
+      .query<
+        {
+          user_id: string;
+          google_sub: string;
+          email: string | null;
+          onboarded: number;
+          created_at: string;
+          updated_at: string;
+        },
+        [string]
+      >("SELECT * FROM account WHERE google_sub = ?")
+      .get(googleSub);
+    return r ? { ...r, onboarded: r.onboarded === 1 } : null;
+  }
+
+  // Sign-in entry point. Returns the existing account for a returning user (NO re-seeding — the
+  // onboarding blurb is never re-injected), or creates a fresh account on first sign-in and seeds
+  // sticky 1 = (optional pre-auth draft) + onboarding blurb, marked as the default shared sticky.
+  findOrCreateAccount(
+    googleSub: string,
+    opts: { email?: string; draft?: string } = {},
+  ): { account: Account; created: boolean } {
+    const existing = this.getAccountByGoogleSub(googleSub);
+    if (existing) return { account: existing, created: false };
+
+    const userId = randomUUID();
+    const ts = this.now();
+    const tx = this.db.transaction(() => {
+      this.db.run(
+        `INSERT INTO account (user_id, google_sub, email, onboarded, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, ?)`,
+        [userId, googleSub, opts.email ?? null, ts, ts],
+      );
+      // Sticky 1 = the carried-over draft + the onboarding blurb. Append the blurb on a fresh line;
+      // if the draft is already large, trim it so draft+blurb never exceeds the cap (the blurb
+      // always fits and stays intact; the user's draft is what yields).
+      const draft = opts.draft ?? "";
+      const seed = composeSeed(draft, ONBOARDING_BLURB);
+      this.create(userId, seed, { shared: true }); // sticky 1, default shared at t=0
+    });
+    tx();
+    return { account: this.getAccountByGoogleSub(googleSub)!, created: true };
+  }
+}
+
+// Combine the pre-auth draft with the onboarding blurb without exceeding MAX_CHARS. The blurb is
+// preserved whole (it's the value-add); the draft is truncated if the two together would overflow.
+export function composeSeed(draft: string, blurb: string): string {
+  const sep = draft ? "\n\n" : "";
+  const full = draft + sep + blurb;
+  if (full.length <= MAX_CHARS) return full;
+  // Keep the blurb + separator; trim the draft to fit.
+  const room = MAX_CHARS - blurb.length - sep.length;
+  if (room <= 0) return blurb.slice(0, MAX_CHARS); // pathological: blurb alone too big
+  return draft.slice(0, room) + sep + blurb;
 }

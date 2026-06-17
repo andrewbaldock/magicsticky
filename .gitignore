@@ -1,0 +1,14 @@
+# personal data — the dogfood list + future local store (never publish)
+TODO.md
+store.json
+data/
+.env
+.env.*
+
+# bun / node
+node_modules/
+*.log
+
+# scratch: out-of-band Claude Code <-> Cowork conversation, not project artifacts
+CONVO-CC.txt
+CONVO-CW.txt

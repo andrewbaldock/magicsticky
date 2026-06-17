@@ -1,0 +1,23 @@
+{
+  "name": "magicsticky",
+  "version": "0.1.0",
+  "description": "Frictionless personal-context + running-list store any Claude can read/write over MCP",
+  "license": "AGPL-3.0",
+  "type": "module",
+  "bin": {
+    "magicsticky": "./src/server.ts"
+  },
+  "scripts": {
+    "start": "bun run src/server.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}

@@ -6,6 +6,7 @@
       "name": "magicsticky",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.29.0",
+        "hono": "^4.12.25",
         "zod": "^4.4.3",
       },
       "devDependencies": {

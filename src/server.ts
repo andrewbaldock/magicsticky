@@ -47,12 +47,14 @@ const server = new McpServer(
   { name: "magicsticky", version: "0.1.0" },
   {
     instructions:
-      "Magic Sticky holds the user's current context as 'stickies' (each: a focus line + a flat list). " +
-      "There is one account-wide ACTIVE sticky, shared across all the user's Claudes. " +
-      "At the START of a session, call `whoami` to load the active sticky's focus and open count as context — " +
-      "this is how you inherit who the user is right now. " +
-      "Capture is one step: `add` needs only `text`. Per-sticky tools act on the active sticky; " +
-      "pass `sticky` to act on another for one call without moving the shared pointer.",
+      "Magic Sticky is the user's living context: a set of 'stickies', each a one-line focus plus a " +
+      "flat list of items. One sticky is ACTIVE account-wide, shared across every one of the user's " +
+      "Claudes. ALWAYS call `whoami` first, before anything else — it returns the active sticky's " +
+      "focus and open-item count, which is how you instantly inherit who the user is and what they're " +
+      "doing right now without being told. Capture is one step: `add` needs only `text`. Per-sticky " +
+      "tools act on the active sticky by default; pass `sticky` to act on another for a single call " +
+      "without moving the shared pointer. Keep it a sticky note — don't expect folders, threads, or " +
+      "rich structure.",
   },
 );
 

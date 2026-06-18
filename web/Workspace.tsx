@@ -19,6 +19,7 @@ function pastelVars(position: number, theme: Theme): CSSProperties {
     ["--sticky" as string]: p.fill,
     ["--sticky-edge" as string]: p.edge,
     ["--sticky-ink" as string]: p.ink,
+    ["--sticky-ink-muted" as string]: p.inkMuted,
   };
 }
 
@@ -90,7 +91,12 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
     enabled: !!activeId,
     refetchInterval: 15_000,
   });
-  if (stickyQuery.error) onError(stickyQuery.error); // surface a 401 from polling
+  // Surface a query error (e.g. a 401 from polling → sign out) from an EFFECT, not the render body —
+  // calling a state setter during render is a React anti-pattern and would re-fire every render.
+  useEffect(() => {
+    const err = stickyQuery.error ?? listQuery.error;
+    if (err) onError(err);
+  }, [stickyQuery.error, listQuery.error, onError]);
 
   // Adopt the server's version into the editor — but NEVER while the user is mid-edit (dirty), or
   // we'd clobber their keystrokes. If a newer version arrived while editing, show a quiet notice;
@@ -141,8 +147,18 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
           const latest = await api.getSticky(id).catch(() => null);
           if (latest) {
             setCurrent(latest);
-            setSave("conflict");
-            if (next !== latest.text) queueSave(next, latest.version, id);
+            qc.setQueryData(["sticky", id], latest);
+            if (next !== latest.text) {
+              setSave("conflict");
+              queueSave(next, latest.version, id); // re-save our text on top of theirs
+            } else {
+              // our text already equals the server's → nothing to re-save. Clear dirty + mark saved
+              // so polling-adoption resumes (otherwise dirty sticks and live-updates silently stop).
+              pending.current = null;
+              dirty.current = false;
+              setStaleNotice(false);
+              setSave("saved");
+            }
           }
           return;
         }

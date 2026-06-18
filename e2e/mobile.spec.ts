@@ -46,6 +46,12 @@ test("settings: gear opens panel; theme toggle flips data-theme + sticky ink; fo
     .poll(async () => page.locator(".sticky-pane").evaluate((el) => getComputedStyle(el).backgroundColor))
     .not.toBe(paneBgBefore); // the sticky fill changed (light pastel → deep pastel)
 
+  // dark-mode CONTRAST (moby's measured bug): the counter's muted ink must flip to a LIGHT value on
+  // the deep-pastel sticky, not stay the dark #6b6657 (which was 1.51:1 / illegible). Assert it's light.
+  const counterColor = await page.locator(".counter").evaluate((el) => getComputedStyle(el).color);
+  const [r, g, b] = counterColor.match(/\d+/g)!.map(Number);
+  expect((r + g + b) / 3, `counter ink should be light in dark mode (got ${counterColor})`).toBeGreaterThan(150);
+
   // font size: Large bumps the scale var
   await page.getByRole("button", { name: "Large" }).click();
   const scale = await page.evaluate(() =>

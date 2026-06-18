@@ -265,22 +265,24 @@ body {
   line-height: 1.6;
 }
 .editor.reader li.md-task--done {
-  color: var(--muted);
+  color: var(--sticky-ink-muted, var(--muted));
   text-decoration: line-through;
-  text-decoration-color: rgba(0, 0, 0, 0.3);
+  text-decoration-color: color-mix(in srgb, var(--sticky-ink, var(--ink)) 45%, transparent);
 }
 .editor.reader li.md-task--done .md-check {
   color: var(--shared);
   text-decoration: none;
 }
+/* code/quote backgrounds are an ink-relative tint so they show on BOTH light + deep-pastel stickies
+   (a black overlay vanishes on a dark sticky). */
 .editor.reader code {
-  background: rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--sticky-ink, var(--ink)) 10%, transparent);
   padding: 0.1em 0.35em;
   border-radius: 4px;
   font-size: 0.9em;
 }
 .editor.reader pre {
-  background: rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--sticky-ink, var(--ink)) 10%, transparent);
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
@@ -290,9 +292,9 @@ body {
   padding: 0;
 }
 .editor.reader blockquote {
-  border-left: 3px solid rgba(0, 0, 0, 0.2);
+  border-left: 3px solid color-mix(in srgb, var(--sticky-ink, var(--ink)) 25%, transparent);
   padding-left: 12px;
-  color: var(--muted);
+  color: var(--sticky-ink-muted, var(--muted));
 }
 .editor.reader a {
   word-break: break-word;
@@ -303,7 +305,7 @@ body {
 .counter {
   padding: 6px 16px calc(var(--safe-b) + 8px);
   font-size: 13px;
-  color: var(--muted);
+  color: var(--sticky-ink-muted, var(--muted)); /* themed: legible on light + deep-pastel stickies */
   text-align: right;
 }
 .counter.over {
@@ -312,7 +314,7 @@ body {
 }
 .save-state {
   float: left;
-  color: var(--muted);
+  color: var(--sticky-ink-muted, var(--muted));
 }
 .save-state.conflict {
   color: var(--danger);

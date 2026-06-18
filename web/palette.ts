@@ -8,6 +8,7 @@ export interface Pastel {
   fill: string;
   edge: string;
   ink: string;
+  inkMuted: string; // secondary ink (counter, done-task, blockquote) — themed so it stays legible
 }
 
 interface PastelPair {
@@ -17,19 +18,29 @@ interface PastelPair {
 
 const DARK_INK = "#2a2a26";
 const LIGHT_INK = "#f3efe6";
+const LIGHT_MUTED = "#6b6657"; // dark warm gray — ~4.65:1 on the light pastels (moby-measured)
+const DARK_MUTED = "rgba(243,239,230,0.72)"; // translucent light ink — legible on the deep pastels
 
-// 10 hues. Light = the existing pastels; dark = a deep muted version of the same hue + light ink.
+// fill+edge per theme; ink/inkMuted are constant per theme (dark↔light), so derive them.
+function light(fill: string, edge: string): Pastel {
+  return { fill, edge, ink: DARK_INK, inkMuted: LIGHT_MUTED };
+}
+function dark(fill: string, edge: string): Pastel {
+  return { fill, edge, ink: LIGHT_INK, inkMuted: DARK_MUTED };
+}
+
+// 10 hues. Light = the existing pastels; dark = a deep version of the same hue + light ink.
 const PALETTE: PastelPair[] = [
-  { light: { fill: "#fbe7a0", edge: "#ecd486", ink: DARK_INK }, dark: { fill: "#5a4a1e", edge: "#6e5c2a", ink: LIGHT_INK } }, // yellow
-  { light: { fill: "#cfe8c9", edge: "#b6d6af", ink: DARK_INK }, dark: { fill: "#2f4a2c", edge: "#3b5b38", ink: LIGHT_INK } }, // green
-  { light: { fill: "#c9e2f0", edge: "#aed0e4", ink: DARK_INK }, dark: { fill: "#27414f", edge: "#33515f", ink: LIGHT_INK } }, // blue
-  { light: { fill: "#e7d4f0", edge: "#d4bce4", ink: DARK_INK }, dark: { fill: "#43314f", edge: "#523e5f", ink: LIGHT_INK } }, // lavender
-  { light: { fill: "#f8d6c4", edge: "#eebfa8", ink: DARK_INK }, dark: { fill: "#553227", edge: "#674033", ink: LIGHT_INK } }, // peach
-  { light: { fill: "#f6cdd6", edge: "#e8b2c0", ink: DARK_INK }, dark: { fill: "#532836", edge: "#653444", ink: LIGHT_INK } }, // pink
-  { light: { fill: "#cfe9e6", edge: "#b3d8d3", ink: DARK_INK }, dark: { fill: "#274a47", edge: "#335b57", ink: LIGHT_INK } }, // teal
-  { light: { fill: "#e3e3c4", edge: "#cfceac", ink: DARK_INK }, dark: { fill: "#46462c", edge: "#565638", ink: LIGHT_INK } }, // olive
-  { light: { fill: "#d9dcef", edge: "#c0c5e2", ink: DARK_INK }, dark: { fill: "#323651", edge: "#3e4360", ink: LIGHT_INK } }, // periwinkle
-  { light: { fill: "#f1ddc0", edge: "#e2c8a4", ink: DARK_INK }, dark: { fill: "#4f3d24", edge: "#604c30", ink: LIGHT_INK } }, // sand
+  { light: light("#fbe7a0", "#ecd486"), dark: dark("#5a4a1e", "#6e5c2a") }, // yellow
+  { light: light("#cfe8c9", "#b6d6af"), dark: dark("#2f4a2c", "#3b5b38") }, // green
+  { light: light("#c9e2f0", "#aed0e4"), dark: dark("#27414f", "#33515f") }, // blue
+  { light: light("#e7d4f0", "#d4bce4"), dark: dark("#43314f", "#523e5f") }, // lavender
+  { light: light("#f8d6c4", "#eebfa8"), dark: dark("#553227", "#674033") }, // peach
+  { light: light("#f6cdd6", "#e8b2c0"), dark: dark("#532836", "#653444") }, // pink
+  { light: light("#cfe9e6", "#b3d8d3"), dark: dark("#274a47", "#335b57") }, // teal
+  { light: light("#e3e3c4", "#cfceac"), dark: dark("#46462c", "#565638") }, // olive
+  { light: light("#d9dcef", "#c0c5e2"), dark: dark("#323651", "#3e4360") }, // periwinkle
+  { light: light("#f1ddc0", "#e2c8a4"), dark: dark("#4f3d24", "#604c30") }, // sand
 ];
 
 export function pastelFor(position: number, theme: "light" | "dark"): Pastel {

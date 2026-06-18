@@ -35,6 +35,19 @@ editable [draw.io](https://app.diagrams.net) file — open
 [`docs/architecture.drawio.svg`](./docs/architecture.drawio.svg) in the draw.io desktop app, the
 VS Code extension, or app.diagrams.net to edit it.
 
+## Gotchas (where bugs hide)
+Hard-won traps for anyone touching the code:
+- **`web/Workspace.tsx` is the danger zone.** It coordinates several async writers over the shared
+  sticky — the debounced save, the backoff retry, the `online`-flush, the TanStack poll-adoption,
+  and offline catch-up. Touch with care and always run the Playwright suite after.
+- **Two `online` listeners** (the save-flush and the offline catch-up flush) fire on the same event
+  and both write the shared sticky. It's only safe because the append path is conflict-free.
+- **`/mcp` must NEVER sit behind an edge proxy** (e.g. a Vercel rewrite). The Streamable-HTTP/SSE
+  session is long-lived and an edge would time it out — this is *why* the whole app is one Fly origin.
+- **Service worker:** navigations are network-first. A cached `index.html` would point at rehashed
+  assets after a deploy and break the app — if you change the shell, bump the cache version in
+  `web/public/sw.js`.
+
 ## Model
 - A **sticky** is one free-text blob, ≤10,000 chars. No folders, no rich text, no item lists.
 - You hold a small **stack** (~10). One is flagged the **shared prompt** (a "lozenge" in the UI).
@@ -81,10 +94,15 @@ AES-256-GCM encryption at rest · AGPL-3.0.
 ```sh
 bun install
 cp .env.example .env     # set MAGICSTICKY_TOKEN, _SESSION_SECRET, _KEYS, _ALLOWED_EMAILS
-bun run start            # the Bun/Hono server on :3000 (API + /mcp)
-bun run dev:web          # the Vite dev server on :5180 (proxies /api + /auth to :3000)
+bun run start            # the Bun/Hono server on :3001 (API + /mcp)
+bun run dev:web          # the Vite dev server on :5180 (proxies /api + /auth to :3001)
 ```
 Prod build: `bun run build:web` then serve with `MAGICSTICKY_WEB_DIST=web/dist` set.
+
+Notes for local dev: the API listens on **:3001** (not 3000 — that's another local app; the server
+refuses to start on 3000 in dev). Google sign-in won't work on `localhost` unless the origin is
+registered with the OAuth client. The server refuses to boot without `MAGICSTICKY_TOKEN`, and in
+production also without `MAGICSTICKY_KEYS` (so a misconfigured deploy never stores data unencrypted).
 
 ## Test
 ```sh

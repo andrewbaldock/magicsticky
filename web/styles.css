@@ -168,7 +168,7 @@ body {
 .head-brand__text {
   font-family: "Julius Sans One", sans-serif;
   font-size: 15px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em; /* Julius Sans One is already wide — keep it tight */
   line-height: 1;
 }
 /* On narrow phones the lozenge + buttons can crowd the center — hide the text, keep the daisy. */

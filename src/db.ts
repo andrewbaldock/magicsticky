@@ -353,6 +353,43 @@ export class Store {
     return r ? accountRowToAccount(r) : null;
   }
 
+  // True if an account exists for this userId. Used to invalidate a session whose account is gone
+  // (e.g. after delete-everything) — a valid cookie must not outlive its account.
+  hasAccount(userId: string): boolean {
+    return !!this.db
+      .query<{ one: number }, [string]>("SELECT 1 AS one FROM account WHERE user_id = ?")
+      .get(userId);
+  }
+
+  // Full account erasure: the account row + ALL its stickies. Irreversible (the data ownership
+  // exit from SPEC §11). Scoped to the one userId.
+  deleteAccount(userId: string): void {
+    const tx = this.db.transaction(() => {
+      this.db.run("DELETE FROM sticky WHERE user_id = ?", [userId]);
+      this.db.run("DELETE FROM account WHERE user_id = ?", [userId]);
+    });
+    tx();
+  }
+
+  // Full plaintext export of a user's data (the JSON dump from SPEC §11). Decrypts text via the
+  // normal read path. Account metadata + every sticky's full text.
+  exportAccount(userId: string): { account: Account | null; stickies: Sticky[] } {
+    const ids = this.db
+      .query<{ id: string }, [string]>("SELECT id FROM sticky WHERE user_id = ? ORDER BY position")
+      .all(userId)
+      .map((r) => r.id);
+    const account =
+      this.db
+        .query<AccountRow, [string]>(
+          "SELECT user_id, google_sub, email, onboarded, created_at, updated_at FROM account WHERE user_id = ?",
+        )
+        .get(userId) ?? null;
+    return {
+      account: account ? accountRowToAccount(account) : null,
+      stickies: ids.map((id) => this.get(userId, id)!),
+    };
+  }
+
   // Generate (or rotate) the user's connector token. Returns the RAW token ONCE — only its hash is
   // stored, so it can never be retrieved again; regenerating overwrites (the old token stops working).
   generateConnectorToken(userId: string): string {

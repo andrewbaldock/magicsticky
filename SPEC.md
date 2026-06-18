@@ -1,5 +1,12 @@
 # Magic Sticky — Design Spec (v0)
 
+> ⚠️ **SUPERSEDED IN PLACES (2026-06-18).** This is the original Phase-0 design. The product pivoted:
+> a sticky is now **one free-text blob** (≤10k chars), not a focus-string + flat item list; the MCP
+> surface is **4 tools** (`whoami`/`write`/`list_stickies`/`set_shared`), not 9; humans use Google
+> sign-in + a per-account connector token, not the old single-URL model. The **authoritative**
+> design + build state is **[plans/phase2-hosted-oauth.md](./plans/phase2-hosted-oauth.md)**. The
+> principles/anti-scope/privacy sections (§3–§5, §11) still hold; §1/§2/§6/§7 describe the retired model.
+
 > A frictionless personal-context + running-list store that **any Claude** (and you, on any device) can read and write. Each **sticky** holds two things — *a focus* ("who/what this is, right now") and *a flat list* — and has its own **URL** for viewing/sharing. You connect a Claude once to your **single account URL** (`magicsticky.andrewbaldock.com`), then browse, pick the active note, or start a new one. Whatever you pick becomes the **shared active note across all your Claudes until you change it** — one in-the-moment context, glued across every AI you use. Nothing else. The whole product is the discipline of nothing else.
 
 ---

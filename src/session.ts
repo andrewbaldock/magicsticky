@@ -27,14 +27,15 @@ export function makeSessionSigner(secret: string, ttlMs = DEFAULT_TTL_MS): Sessi
     },
     verify(token) {
       if (!token) return null;
-      // Parse on the first two dots: userId.expiry.mac. ASSUMES userId is dot-free (true — it's a
-      // UUID). If userId ever gains dots, switch to parsing the mac from the right (last dot).
-      const i1 = token.indexOf(SEP);
-      const i2 = token.indexOf(SEP, i1 + 1);
-      if (i1 < 0 || i2 < 0) return null;
-      const userId = token.slice(0, i1);
-      const expiry = token.slice(i1 + 1, i2);
-      const mac = token.slice(i2 + 1);
+      // Parse the mac from the RIGHT (last dot) and expiry from the next-to-last, so a userId
+      // containing dots can't confuse the split. data = everything before the mac = "userId.expiry".
+      const macAt = token.lastIndexOf(SEP);
+      if (macAt <= 0) return null;
+      const expAt = token.lastIndexOf(SEP, macAt - 1);
+      if (expAt <= 0) return null;
+      const userId = token.slice(0, expAt);
+      const expiry = token.slice(expAt + 1, macAt);
+      const mac = token.slice(macAt + 1);
       const data = `${userId}${SEP}${expiry}`;
       const expected = sign(data);
       // constant-time compare; equal-length guard avoids timingSafeEqual throwing

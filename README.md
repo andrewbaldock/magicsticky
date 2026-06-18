@@ -1,70 +1,51 @@
 # magicsticky
 
-Frictionless text notes — for humans AND shared AI prompts.
+Hosted sticky notes — for humans AND as a shared prompt any Claude can read.
 
-Cloud sticky notes for your life: each sticky has its own URL, and **any Claude** can read, update,
-or create them — reachable in one tap on any device. One shared **active note** is the glue across
-all your Claudes: set it once and every Claude inherits it (via `whoami`) until you change it.
+You keep a small stack of plain-text sticky notes. **Exactly one** is the **shared prompt**: the
+note every Claude you connect reads (and can update) over MCP, so each AI you talk to inherits your
+current context. You reach the notes from a phone-first web app; a Claude reaches them through one
+connector token. The whole product is the discipline of staying a sticky note.
 
-The whole product is the discipline of staying a sticky note — see the manifesto in the spec.
+## Model
+- A **sticky** is one free-text blob, ≤10,000 chars. No folders, no rich text, no item lists.
+- You hold a small **stack** (~10). One is flagged the **shared prompt** (a "lozenge" in the UI).
+- **Humans** sign in with Google (web app); **Claude** authenticates with a per-account bearer
+  **connector token** generated in the app ("Connect a Claude").
+- The 4 MCP tools: `whoami` (read the shared sticky), `write` (replace it, with an optimistic
+  `version` to avoid clobbering), `list_stickies` (metadata only — never the other notes' text),
+  `set_shared` (flip which note is shared).
 
-## Docs
-- **[SPEC.md](./SPEC.md)** — full design: principles, anti-scope, the ~9-tool surface, schema, architecture, privacy/encryption.
-- **[CLAUDE.md](./CLAUDE.md)** — working agreements for AI assistants in this repo.
-- **[NEXT.md](./NEXT.md)** — Phase 1 build handoff. **Claude Code starts here.**
+## Stack
+Bun + Hono + `bun:sqlite` (one Fly app) · React 19 + Vite frontend · MCP over Streamable HTTP ·
+AES-256-GCM encryption at rest · AGPL-3.0.
 
-## Phase 1 — local MCP server (stdio)
-
-A local stdio MCP server in Bun + TypeScript. It's the real backend for Andrew's TODO
-(dogfooded). No hosting, OAuth, or web UI yet — those are Phases 2–3.
-
-### Run it
-
+## Run it (dev)
 ```sh
 bun install
-bun start          # serves MCP over stdio (no output until a client connects)
-bun test           # end-to-end smoke test: drives all 9 tools over a real stdio server
+cp .env.example .env     # set MAGICSTICKY_TOKEN, _SESSION_SECRET, _KEYS, _ALLOWED_EMAILS
+bun run start            # the Bun/Hono server on :3000 (API + /mcp)
+bun run dev:web          # the Vite dev server on :5180 (proxies /api + /auth to :3000)
 ```
+Prod build: `bun run build:web` then serve with `MAGICSTICKY_WEB_DIST=web/dist` set.
 
-Storage is a single JSON file at `~/.magicsticky/store.json` (atomic writes). Override the
-path with the `MAGICSTICKY_STORE` env var (the test suite uses a temp dir).
-
-### Register in Claude Code
-
+## Test
 ```sh
-claude mcp add magicsticky -- bun run /Users/andrewbaldock/Code/magicsticky/src/server.ts
+bun run test       # backend unit/integration (bun:test)
+bun run test:e2e   # Playwright UI E2E on iPhone / Pixel / Desktop
+bun run typecheck  # backend + web/
 ```
 
-Or add to a project's `.mcp.json`:
+## Register the connector in a Claude
+Sign in to the web app → **Connect a Claude** → generate a token → add a custom MCP connector
+pointing at `https://<host>/mcp` with `Authorization: Bearer <token>`. Then call `whoami` first to
+load your shared sticky as context.
 
-```jsonc
-{
-  "mcpServers": {
-    "magicsticky": {
-      "command": "bun",
-      "args": ["run", "/Users/andrewbaldock/Code/magicsticky/src/server.ts"]
-    }
-  }
-}
-```
-
-> **Convention:** call `whoami` at the start of a session to inherit the active sticky as
-> context (see SPEC §9). A one-line `CLAUDE.md` instruction makes it the obvious opening move.
-
-### Register in Cowork
-
-Add a custom stdio MCP server with command `bun` and args
-`run /Users/andrewbaldock/Code/magicsticky/src/server.ts`. Same active-sticky pointer; the
-two clients share `~/.magicsticky/store.json`.
-
-### The 9 tools
-
-Browse/pick/create: `list_stickies` · `use_sticky` · `create_sticky`.
-Per-sticky (act on the active sticky; pass `sticky` to override for one call):
-`whoami` · `get_list` · `add` · `complete` · `set_focus` · `update`.
-
-`use_sticky` sets the account-wide **active sticky** that persists across all clients —
-that shared pointer is the whole point. `add` requires only `text`; capture is one step.
+## Docs
+- **[plans/phase2-hosted-oauth.md](./plans/phase2-hosted-oauth.md)** — the current, authoritative design + build plan.
+- **[SPEC.md](./SPEC.md)** / **[CLAUDE.md](./CLAUDE.md)** / **[NEXT.md](./NEXT.md)** — earlier
+  Phase-0/1 docs. **Superseded in places by the pivot** (they describe a 9-tool focus+item model
+  that no longer ships); the plan above is the source of truth.
 
 ## License
 AGPL-3.0 (network-use clause closes the SaaS loophole; relicense to permissive later is possible, the reverse isn't).

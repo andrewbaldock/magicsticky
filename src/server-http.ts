@@ -69,9 +69,16 @@ if (!token) {
 }
 
 // App-layer encryption of sticky text at rest (SPEC §11). Keys from MAGICSTICKY_KEYS as
-// "id:hexkey,..." (first = primary). Unset → plaintext at rest (dev). Warn if unset in prod-ish.
+// "id:hexkey,..." (first = primary). In production, REFUSE to boot without keys — a misconfigured
+// deploy must never silently store this sensitive data as plaintext. In dev, plaintext + a warning.
 const cipher = cipherFromEnv(process.env.MAGICSTICKY_KEYS);
-if (!cipher) console.warn("MAGICSTICKY_KEYS not set — sticky text stored as PLAINTEXT at rest.");
+if (!cipher) {
+  if (process.env.NODE_ENV === "production") {
+    console.error("Refusing to start in production: set MAGICSTICKY_KEYS (encryption at rest).");
+    process.exit(1);
+  }
+  console.warn("MAGICSTICKY_KEYS not set — sticky text stored as PLAINTEXT at rest (dev only).");
+}
 
 const store = new Store(dbPath, cipher);
 
@@ -91,6 +98,9 @@ const app = createApp({
     (!!id.email && allowedEmails.includes(id.email.toLowerCase())),
   session: sessionSecret ? makeSessionSigner(sessionSecret) : undefined,
   secureCookie: process.env.NODE_ENV === "production",
+  // Serve the built UI from this origin when MAGICSTICKY_WEB_DIST points at web/dist (prod). In dev
+  // we run Vite separately on :5180; leave it unset.
+  webDist: process.env.MAGICSTICKY_WEB_DIST,
 });
 
 console.log(

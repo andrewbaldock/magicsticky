@@ -1,5 +1,12 @@
 # CLAUDE.md — working agreements for Magic Sticky
 
+> ⚠️ **PARTIALLY SUPERSEDED (2026-06-18).** The product pivoted to a hosted web app: a sticky is one
+> free-text blob (≤10k), the MCP surface is **4 tools** (`whoami`/`write`/`list_stickies`/`set_shared`),
+> storage is SQLite-on-Fly (not the local JSON store), humans use Google sign-in + a per-account
+> connector token. The working-agreement *principles* below (prime directive, privacy, verify-before-
+> claiming-done, maintainer-commits) still hold; specifics about the 9-tool/stdio model are stale.
+> Authoritative current design + build: **[plans/phase2-hosted-oauth.md](./plans/phase2-hosted-oauth.md)**.
+
 Notes for any AI assistant (Claude Code, Cowork) working in this repo.
 
 ## What this is

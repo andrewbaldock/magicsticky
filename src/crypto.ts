@@ -74,6 +74,7 @@ export function cipherFromEnv(env: string | undefined): Cipher | null {
     if (idx < 0) throw new Error(`bad key entry "${e}" — expected id:hexkey`);
     const id = e.slice(0, idx);
     const hex = e.slice(idx + 1);
+    if (id in keys) throw new Error(`duplicate key id "${id}" in MAGICSTICKY_KEYS`); // fail loud
     const buf = Buffer.from(hex, "hex");
     keys[id] = buf;
     if (!primary) primary = id;

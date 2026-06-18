@@ -1,0 +1,316 @@
+/* Magic Sticky — mobile-first. Sized to the *visual* viewport (dvh/svh) so the iOS keyboard never
+   pushes content off-screen; safe-area insets so nothing hides under the notch/home bar. No
+   hover-only controls; touch targets >= 44px. */
+
+:root {
+  --sticky: #f7d774; /* the sticky-note yellow */
+  --sticky-edge: #e6c24a;
+  --ink: #2a2a26;
+  --muted: #6b6657;
+  --bg: #2a2a2e;
+  --shared: #2e7d52;
+  --danger: #b3402f;
+  --tap: 44px; /* min touch target */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Touch: no hover on phones, so give every control a deliberate pressed state + kill the default
+   gray iOS tap box (we provide our own feedback). */
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* no 300ms double-tap-zoom delay */
+}
+button:active {
+  opacity: 0.6;
+  transform: scale(0.98);
+}
+button:disabled:active {
+  opacity: 0.3;
+  transform: none;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%; /* iOS: don't auto-zoom text */
+}
+
+/* App shell: full visual-viewport height; svh avoids the iOS 100vh overshoot. */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  height: 100dvh;
+  padding-left: var(--safe-l);
+  padding-right: var(--safe-r);
+}
+
+/* ---- nav switcher: a horizontal scrollable tab strip (mobile-friendly) ---- */
+.nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: calc(var(--safe-t) + 8px) 8px 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  background: var(--bg);
+}
+.nav::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  flex: 0 0 auto;
+  max-width: 42vw;
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--sticky-edge);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.tab.active {
+  background: var(--sticky);
+  opacity: 1;
+}
+.tab .tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tab .shared-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--shared);
+}
+.tab-add {
+  flex: 0 0 auto;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #cfcabb;
+  font-size: 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- the current sticky fills the rest of the screen ---- */
+.sticky-pane {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--sticky);
+  min-height: 0; /* let the textarea scroll, not the page */
+}
+.sticky-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+.lozenge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap); /* >=44px touch target */
+  padding: 0 14px;
+  border: 1.5px solid var(--shared);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--shared);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.lozenge.is-shared {
+  background: var(--shared);
+  color: #fff;
+}
+.head-spacer {
+  flex: 1;
+}
+.icon-btn {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  border-radius: 8px;
+}
+.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.editor {
+  flex: 1 1 auto;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 17px; /* >=16px so iOS doesn't zoom on focus */
+  line-height: 1.6;
+  padding: 16px;
+  min-height: 0;
+}
+.counter {
+  padding: 6px 16px calc(var(--safe-b) + 8px);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+}
+.counter.over {
+  color: var(--danger);
+  font-weight: 700;
+}
+.save-state {
+  float: left;
+  color: var(--muted);
+}
+.save-state.conflict {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* ---- signed-out landing: one big sticky you can type into + sign-in CTA ---- */
+.landing {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  height: 100dvh;
+  background: var(--sticky);
+  padding: calc(var(--safe-t) + 16px) max(16px, var(--safe-l)) calc(var(--safe-b) + 16px)
+    max(16px, var(--safe-r));
+}
+.landing h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+.landing p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.landing .editor {
+  border: 1px dashed var(--sticky-edge);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.cta {
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---- connector-token sheet (bottom sheet on mobile) ---- */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10;
+}
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 16px 16px 0 0;
+  padding: 20px max(16px, var(--safe-l)) calc(var(--safe-b) + 20px) max(16px, var(--safe-r));
+  overscroll-behavior: contain; /* scroll chaining doesn't leak to the page behind */
+}
+.sheet h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.token-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+}
+.token-box code {
+  flex: 1;
+  word-break: break-all; /* show the whole token (no tiny horizontal scroll strip on mobile) */
+  background: #f1efe7;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.btn {
+  min-height: var(--tap);
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid rgba(0, 0, 0, 0.2);
+}
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* link styling (used by the connector sheet's docs link, and a future read view) */
+a {
+  color: #1a6cc4;
+}
+
+/* Wider screens: cap the writing column so lines aren't absurdly long, keep it centered. */
+@media (min-width: 720px) {
+  .sticky-pane,
+  .landing {
+    max-width: 760px;
+    margin: 0 auto;
+    width: 100%;
+  }
+}

@@ -159,3 +159,44 @@ test("PRIVACY: the human title endpoint decrypts, but MCP list stays metadata-on
   const withTitles = store.listWithTitles(account.user_id);
   expect(withTitles[0].title).toBe("secret first line");
 });
+
+test("logout clears the cookie; the session then 401s", async () => {
+  const cookie = await signIn("note");
+  expect((await fetch(`${base}/api/stickies`, { headers: { cookie } })).status).toBe(200);
+  const out = await fetch(`${base}/api/logout`, { method: "POST", headers: { cookie } });
+  expect(out.status).toBe(200);
+  expect((out.headers.get("set-cookie") ?? "")).toContain("ms_session="); // a clearing cookie
+});
+
+test("export returns the user's decrypted data as a JSON download", async () => {
+  const cookie = await signIn("my private note");
+  const res = await fetch(`${base}/api/export`, { headers: { cookie } });
+  expect(res.status).toBe(200);
+  expect(res.headers.get("content-disposition")).toContain("magicsticky-export.json");
+  const data = (await res.json()) as { account: { user_id: string }; stickies: { text: string }[] };
+  expect(data.account).toBeTruthy();
+  expect(data.stickies[0].text).toContain("my private note"); // decrypted plaintext
+});
+
+test("delete-everything: requires the confirm token, then erases and invalidates the session", async () => {
+  const cookie = await signIn("doomed");
+  // wrong/missing confirmation → 400, nothing deleted
+  const bad = await fetch(`${base}/api/delete-everything`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ confirm: "nope" }),
+  });
+  expect(bad.status).toBe(400);
+  expect((await fetch(`${base}/api/stickies`, { headers: { cookie } })).status).toBe(200); // still there
+
+  // correct confirmation → 200, account gone
+  const del = await fetch(`${base}/api/delete-everything`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ confirm: "DELETE" }),
+  });
+  expect(del.status).toBe(200);
+
+  // the same cookie is now invalid — account no longer exists → 401 (session can't outlive account)
+  expect((await fetch(`${base}/api/stickies`, { headers: { cookie } })).status).toBe(401);
+});

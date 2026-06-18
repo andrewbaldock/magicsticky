@@ -6,7 +6,8 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { getCookie, setCookie } from "hono/cookie";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
+import { serveStatic } from "hono/bun";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Store, VersionConflictError, TooLongError, NotFoundError } from "./db.ts";
 import { buildMcpServer } from "./mcp.ts";
@@ -38,6 +39,9 @@ export interface AppOptions {
   session?: SessionSigner;
   // Set Secure on the session cookie (true in prod over HTTPS; false for http://localhost dev).
   secureCookie?: boolean;
+  // Absolute path to the built web app (web/dist) to serve from this origin in prod. Omit in dev
+  // (Vite serves the UI) and in tests.
+  webDist?: string;
 }
 
 type Variables = { userId: string };
@@ -49,6 +53,7 @@ export function createApp({
   isAllowed = () => false,
   session,
   secureCookie = true,
+  webDist,
 }: AppOptions): Hono<{ Variables: Variables }> {
   const app = new Hono<{ Variables: Variables }>();
 
@@ -137,9 +142,21 @@ export function createApp({
   app.use("/api/*", async (c, next) => {
     if (!session) return c.json({ error: "sessions not configured" }, 501);
     const userId = session.verify(getCookie(c, SESSION_COOKIE) ?? "");
-    if (!userId) return c.json({ error: "not signed in" }, 401);
+    // Valid signature is not enough — the account must still exist. A cookie must never outlive its
+    // account (e.g. after delete-everything); clear it and 401 if the account is gone.
+    if (!userId || !store.hasAccount(userId)) {
+      deleteCookie(c, SESSION_COOKIE, { path: "/" });
+      return c.json({ error: "not signed in" }, 401);
+    }
     c.set("userId", userId);
     await next();
+  });
+
+  // Sign out: clear the session cookie. Stateless tokens can't be server-revoked, but clearing the
+  // cookie ends the session on this device (the point of a logout button on a shared browser).
+  app.post("/api/logout", (c) => {
+    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    return c.json({ ok: true });
   });
 
   // List the stack WITH derived titles (human path — may see own notes' titles; the MCP
@@ -207,8 +224,47 @@ export function createApp({
     return c.json({ token });
   });
 
-  // Human-facing routes (landing sticky, /app, /export, /delete-everything) land in later steps.
-  app.get("/", (c) => c.text("Magic Sticky — coming soon."));
+  // Export: full plaintext JSON dump of the user's own data (SPEC §11 "ship from day one"). Behind
+  // the session, scoped to the user; the server decrypts (it's the owner's data behind their auth).
+  app.get("/api/export", (c) => {
+    const data = store.exportAccount(c.get("userId"));
+    c.header("Content-Disposition", 'attachment; filename="magicsticky-export.json"');
+    return c.json(data);
+  });
+
+  // Delete everything: irreversible erasure of the account + all stickies. POST + a typed
+  // confirmation token (never a GET — a prefetch/scanner must not be able to trigger it). Clears
+  // the session after.
+  app.post("/api/delete-everything", async (c) => {
+    let body: { confirm?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "expected JSON body" }, 400);
+    }
+    if (body.confirm !== "DELETE") {
+      return c.json({ error: 'confirmation required: { "confirm": "DELETE" }' }, 400);
+    }
+    store.deleteAccount(c.get("userId"));
+    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    return c.json({ ok: true });
+  });
+
+  // Serve the built React app (web/dist) from the same origin in prod. `webDist` is the built dir;
+  // omitted in dev (Vite serves the UI on :5180 and proxies /api+/auth here) and in tests.
+  if (webDist) {
+    app.use("/assets/*", serveStatic({ root: webDist }));
+    // SPA fallback: any non-API/MCP GET returns index.html so client routing works. Read the file
+    // directly (robust across Hono serveStatic path-resolution quirks) and serve it as HTML.
+    const indexHtml = `${webDist}/index.html`;
+    app.get("*", async (c) => {
+      const file = Bun.file(indexHtml);
+      if (!(await file.exists())) return c.text("UI not built (run: bun run build:web)", 500);
+      return c.html(await file.text());
+    });
+  } else {
+    app.get("/", (c) => c.text("Magic Sticky — UI served by Vite in dev (:5180) or web/dist in prod."));
+  }
 
   return app;
 }

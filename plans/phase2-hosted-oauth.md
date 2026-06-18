@@ -164,6 +164,31 @@ size bound.
    - §8: kill the stale per-sticky `/<slug>/mcp` diagram (one account `/mcp`).
    - README: connector registration with the bearer token.
 
+## STATUS (2026-06-18) — steps 1–7 + 9 DONE; review-cleanup pass applied
+- **5b DONE:** React+Vite UI (web/) — full-screen sticky, nav switcher (first-line titles), char
+  counter, shared lozenge, undo, logout, Connect-a-Claude sheet, localStorage-draft landing + GIS
+  sign-in. Hono serves web/dist in prod (MAGICSTICKY_WEB_DIST). Playwright E2E (e2e/) on iPhone/
+  Pixel/Desktop, 12 green.
+- **6 DONE:** GET /api/export (decrypted JSON download) + POST /api/delete-everything (confirm
+  token "DELETE", clears session). Both session-scoped.
+- **7 DONE:** scripts/migrate-store.ts — flattens old focus+items JSON → text blob, imports per
+  --user, optional --shared; round-trips through encryption. (Run at real cutover.)
+- **9 DONE (banners):** README rewritten to the pivot; SPEC.md + CLAUDE.md carry SUPERSEDED
+  banners pointing here. (Full SPEC §1/§2/§6/§7 rewrite still optional; banners prevent misleading.)
+- **Phase-1 stdio retired:** src/server.ts, src/store.ts, test/smoke.test.ts deleted; package
+  bin/start → server-http.ts; description fixed.
+- **Three-reviewer cleanup applied (odin/angel/moby):** logout + session-can't-outlive-account (401
+  + clear cookie); frontend handlers wrapped (401→signed-out, else error state); App retry on
+  non-401; actionable 409 (adopt latest + re-arm save); autolink deleted (dead); navTitle inlined,
+  onToggleShared simplified, useGoogleSignIn single-cleanup; cipherFromEnv dup-key throw; session
+  parse-from-last-dot; prod refuses boot without MAGICSTICKY_KEYS; web/ now typechecked.
+  MOBILE: lozenge → 44px (+ test now measures it), :active feedback + tap-highlight off +
+  touch-action, landing autoFocus dropped, connector sheet = scroll-lock + focus-trap + Escape +
+  role=dialog + guard backdrop-close on a revealed token, token wraps (no h-scroll).
+- **NOT done (deferred): step 8 Fly deploy**, and the **PWA surface** (manifest/icons/apple-touch/
+  service worker) — that's Phase 3 per SPEC. rekeyAll(userId) still deferred (key-compromise path).
+- Suite: backend 55/55, web tsc clean, Playwright 12/12.
+
 ## Risks
 - **`write` concurrency** is THE risk (two writers on the shared sticky) — mitigated by step-1
   optimistic version + undo. Test it explicitly.

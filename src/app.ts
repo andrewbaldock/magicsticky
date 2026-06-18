@@ -254,6 +254,25 @@ export function createApp({
   // omitted in dev (Vite serves the UI on :5180 and proxies /api+/auth here) and in tests.
   if (webDist) {
     app.use("/assets/*", serveStatic({ root: webDist }));
+    // Root-level static files (PWA manifest, icons, favicon) — these live at "/" not "/assets", so
+    // they'd otherwise fall through to the SPA and return index.html. Serve them explicitly with
+    // correct content-types so the PWA installs and icons load.
+    const rootFiles: Record<string, string> = {
+      "/manifest.webmanifest": "application/manifest+json",
+      "/favicon.svg": "image/svg+xml",
+      "/icon.svg": "image/svg+xml",
+      "/icon-192.png": "image/png",
+      "/icon-512.png": "image/png",
+      "/icon-180.png": "image/png",
+    };
+    for (const [path, type] of Object.entries(rootFiles)) {
+      app.get(path, async (c) => {
+        const f = Bun.file(`${webDist}${path}`);
+        if (!(await f.exists())) return c.notFound();
+        c.header("Content-Type", type);
+        return c.body(await f.arrayBuffer());
+      });
+    }
     // SPA fallback: any non-API/MCP GET returns index.html so client routing works. Read the file
     // directly (robust across Hono serveStatic path-resolution quirks) and serve it as HTML.
     const indexHtml = `${webDist}/index.html`;

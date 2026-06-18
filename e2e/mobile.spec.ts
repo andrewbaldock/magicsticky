@@ -84,6 +84,30 @@ test("markdown read view: a bare URL renders as a clickable link; raw HTML is sa
   expect(html).not.toContain("onerror");
 });
 
+test("PWA: manifest + icons are served (installable), index links them", async ({ page, request }) => {
+  // the manifest serves as JSON with icons (not the SPA fallback HTML)
+  const m = await request.get("/manifest.webmanifest");
+  expect(m.status()).toBe(200);
+  expect(m.headers()["content-type"]).toContain("manifest");
+  const manifest = await m.json();
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+  expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === "maskable")).toBe(true);
+
+  // icons + apple-touch are real PNGs, not HTML
+  for (const p of ["/icon-192.png", "/icon-512.png", "/icon-180.png"]) {
+    const r = await request.get(p);
+    expect(r.status(), p).toBe(200);
+    expect(r.headers()["content-type"], p).toContain("image/png");
+  }
+
+  // index.html links the manifest + apple-touch + iOS standalone meta
+  await page.goto("/");
+  await expect(page.locator('link[rel="manifest"]')).toHaveCount(1);
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute("content", "yes");
+});
+
 test("MOBILE: no horizontal overflow; editor fits the viewport", async ({ page }) => {
   await signIn(page, "a note");
   await page.goto("/");

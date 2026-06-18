@@ -3,8 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f4c542" />
+    <meta name="theme-color" content="#f7d774" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <!-- PWA: installable to the home screen. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- iOS standalone (iOS ignores the manifest; these make Add-to-Home open chrome-less). -->
+    <link rel="apple-touch-icon" href="/icon-180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Magic Sticky" />
     <title>Magic Sticky</title>
     <!-- Google Identity Services (GIS) — provides the sign-in button + ID-token credential. -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>

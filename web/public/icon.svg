@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- App icon (maskable): full-bleed sticky-yellow ground with the daisy centered inside the safe
+       zone (~80% — petals stay well within the maskable crop). -->
+  <rect width="512" height="512" fill="#f7d774"/>
+  <g transform="translate(256 256) scale(2.4)">
+    <g fill="#ffffff" stroke="#e6c24a" stroke-width="1.5">
+      <g><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(45)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(90)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(135)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(180)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(225)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(270)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(315)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+    </g>
+    <circle cx="0" cy="0" r="10" fill="#ffffff" stroke="#e6c24a" stroke-width="1.5"/>
+    <circle cx="0" cy="0" r="6.5" fill="#e6a93a"/>
+  </g>
+</svg>

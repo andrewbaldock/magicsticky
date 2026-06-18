@@ -119,9 +119,27 @@ size bound.
    real session cookie/web-token lands with the PWA (step 5). Connector still uses the bearer token.
    Two step-2 hardening notes also folded in: constant-time token compare (sha256+timingSafeEqual)
    and the stateless cleanup confirmed (per-request server GC'd; no explicit close for JSON tools).
-4. **AEAD-at-rest** on text/prev_text (key-id + rotation); round-trip test.
-5. **Web UI**: stack of 10, free-text editing, **live char counter**, interactive **shared-prompt
-   lozenge** (click to flip). Public landing sticky + save CTA (localStorage → POST on auth).
+4. **[DONE]** AEAD-at-rest. `src/crypto.ts` AES-256-GCM `AeadCipher` (iv|tag|data base64), keyed by
+   a named-key set with a primary + older keys for rotation; `cipherFromEnv("id:hex,...")`.
+   Encryption lives INSIDE the Store (constructor takes an optional Cipher); `encOut`/`decIn`
+   boundary so callers always deal in plaintext. `key_id` column per row; writeShared re-encrypts
+   the undo stash under the current key (lazy rotation). char_count stays plaintext length.
+   6 tests: round-trip + tamper-reject, on-disk-is-ciphertext, rotation, plaintext fallback.
+   Wired via MAGICSTICKY_KEYS (unset → plaintext + a warning). 44/44 suite. Also folded the step-3
+   security MUST-FIX: sign-in ALLOWLIST (deny-all default; 403 before any account create) +
+   email_verified required in the real verifier.
+5. **Web UI (React + Vite).** UX model (Andrew, 2026-06-17): the CURRENT sticky fills the whole
+   screen (one big textarea, focus on writing); a **navigation switcher** moves among the 10; each
+   sticky's nav **title = its first line / first ~30 chars**, derived live (NO separate title field
+   — a sticky is just text). Plus: **live char counter**, interactive **shared-prompt lozenge**
+   (click to flip), public landing sticky + save CTA (localStorage → POST on auth).
+   - **5a (build first, headless-testable): human `/api` + session.** The browser uses a HUMAN auth
+     path (signed-in session cookie), NOT the MCP bearer token. Endpoints: list (WITH derived
+     titles — human may see their own notes), get/save sticky (version CAS, same store path), set
+     shared, undo. Session issued on Google sign-in (swap the user_id-in-body for a cookie, per
+     Cowork). **IMPORTANT:** the derived-title list is a HUMAN endpoint only; the MCP
+     `list_stickies` stays METADATA-ONLY (no text/title) — the privacy boundary holds.
+   - **5b: the React UI** on those endpoints.
    **Autolink bare URLs at render time** (display affordance only; storage stays plain text, no
    markdown editor, no `[text](url)`). Security: HTML-escape the sticky text BEFORE linkifying
    (untrusted input → XSS), emit `rel="noopener noreferrer"`. The MCP path is untouched — Claude

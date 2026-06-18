@@ -10,6 +10,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { Store } from "./db.ts";
+import { cipherFromEnv } from "./crypto.ts";
+import { makeSessionSigner } from "./session.ts";
 import { createApp, type GoogleIdentity } from "./app.ts";
 
 // Real Google ID-token verifier: validates the JWT signature against Google's published certs and
@@ -24,7 +26,13 @@ function makeGoogleVerifier(clientId: string): (credential: string) => Promise<G
         audience: clientId,
       });
       if (!payload.sub) return null;
-      return { sub: payload.sub, email: typeof payload.email === "string" ? payload.email : undefined };
+      // Don't trust an unverified-email Google account.
+      if (payload.email_verified !== true) return null;
+      return {
+        sub: payload.sub,
+        email: typeof payload.email === "string" ? payload.email : undefined,
+        email_verified: true,
+      };
     } catch {
       return null; // bad signature / expired / wrong audience
     }
@@ -45,20 +53,44 @@ const token = process.env.MAGICSTICKY_TOKEN;
 const userId = process.env.MAGICSTICKY_USER ?? "andrew";
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
+// Who may sign in (comma-separated). Single-user/demo allowlist — without it, sign-in is deny-all.
+const allowedSubs = (process.env.MAGICSTICKY_ALLOWED_SUBS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowedEmails = (process.env.MAGICSTICKY_ALLOWED_EMAILS ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
 
 if (!token) {
   console.error("Refusing to start: set MAGICSTICKY_TOKEN (the connector bearer token).");
   process.exit(1);
 }
 
-const store = new Store(dbPath);
+// App-layer encryption of sticky text at rest (SPEC §11). Keys from MAGICSTICKY_KEYS as
+// "id:hexkey,..." (first = primary). Unset → plaintext at rest (dev). Warn if unset in prod-ish.
+const cipher = cipherFromEnv(process.env.MAGICSTICKY_KEYS);
+if (!cipher) console.warn("MAGICSTICKY_KEYS not set — sticky text stored as PLAINTEXT at rest.");
+
+const store = new Store(dbPath, cipher);
 
 // Single-user MVP: exactly one valid token → one user. The resolver is the single auth seam for
 // when multi-user lands.
+const sessionSecret = process.env.MAGICSTICKY_SESSION_SECRET;
+if (googleClientId && !sessionSecret) {
+  console.warn("GOOGLE_CLIENT_ID set but MAGICSTICKY_SESSION_SECRET is not — /api sign-in disabled.");
+}
+
 const app = createApp({
   store,
   resolveToken: (t) => (tokenMatches(t, token) ? userId : null),
   verifyGoogleToken: googleClientId ? makeGoogleVerifier(googleClientId) : undefined,
+  isAllowed: (id) =>
+    allowedSubs.includes(id.sub) ||
+    (!!id.email && allowedEmails.includes(id.email.toLowerCase())),
+  session: sessionSecret ? makeSessionSigner(sessionSecret) : undefined,
+  secureCookie: process.env.NODE_ENV === "production",
 });
 
 console.log(

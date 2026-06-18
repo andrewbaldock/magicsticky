@@ -12,7 +12,8 @@
 //      privacy boundary that makes "only the shared one is readable by Claude" actually true.
 
 import { Database } from "bun:sqlite";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes, createHash } from "node:crypto";
+import type { Cipher } from "./crypto.ts";
 
 export const MAX_CHARS = 10_000; // per-sticky cap; UI shows a counter, store enforces it
 // Soft stack cap. INTENTIONALLY enforced in the UI only (creating a sticky is a web action) — the
@@ -72,6 +73,23 @@ export interface Account {
   updated_at: string;
 }
 
+interface AccountRow {
+  user_id: string;
+  google_sub: string;
+  email: string | null;
+  onboarded: number;
+  created_at: string;
+  updated_at: string;
+}
+
+function accountRowToAccount(r: AccountRow): Account {
+  return { ...r, onboarded: r.onboarded === 1 };
+}
+
+function sha256(s: string): string {
+  return createHash("sha256").update(s).digest("hex");
+}
+
 // The onboarding blurb appended to sticky 1 on first signup. Plain text (a sticky is not rich
 // text). Deletable by the user; never re-injected (guarded by account.onboarded).
 export const ONBOARDING_BLURB =
@@ -86,6 +104,7 @@ interface Row {
   text: string;
   prev_text: string | null;
   char_count: number;
+  key_id: string | null;
   is_shared: number;
   position: number;
   version: number;
@@ -93,18 +112,50 @@ interface Row {
   updated_at: string;
 }
 
-function rowToSticky(r: Row): Sticky {
-  return { ...r, is_shared: r.is_shared === 1 };
-}
-
 export class Store {
   private db: Database;
+  private cipher: Cipher | null;
 
-  constructor(path = ":memory:") {
+  // Pass a Cipher to encrypt `text`/`prev_text` at rest (SPEC §11). Omit (dev/test) → plaintext.
+  constructor(path = ":memory:", cipher: Cipher | null = null) {
     this.db = new Database(path);
+    this.cipher = cipher;
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec("PRAGMA foreign_keys = ON;");
     this.migrate();
+  }
+
+  // --- encryption boundary: stored form <-> plaintext. Everything above this deals in plaintext. ---
+
+  // Encrypt a value for storage; returns the stored string + the key_id it's under (null if no
+  // cipher). The owning user_id is bound as AAD so a blob only decrypts in its owner's context.
+  // Both text and prev_text in a row share the same key_id (the current primary key).
+  private encOut(plaintext: string, userId: string): { stored: string; keyId: string | null } {
+    if (!this.cipher) return { stored: plaintext, keyId: null };
+    const { ciphertext, keyId } = this.cipher.encrypt(plaintext, userId);
+    return { stored: ciphertext, keyId };
+  }
+
+  private decIn(stored: string | null, keyId: string | null, userId: string): string | null {
+    if (stored === null) return null;
+    if (keyId === null || !this.cipher) return stored; // stored plaintext
+    return this.cipher.decrypt(stored, keyId, userId);
+  }
+
+  // Map a stored row to a plaintext Sticky (decrypting text/prev_text; key_id stays internal).
+  private rowToSticky(r: Row): Sticky {
+    return {
+      id: r.id,
+      user_id: r.user_id,
+      text: this.decIn(r.text, r.key_id, r.user_id) ?? "",
+      prev_text: this.decIn(r.prev_text, r.key_id, r.user_id),
+      char_count: r.char_count,
+      is_shared: r.is_shared === 1,
+      position: r.position,
+      version: r.version,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+    };
   }
 
   private migrate(): void {
@@ -118,6 +169,9 @@ export class Store {
         -- (not LENGTH of the text column) so that when step 4 encrypts text at rest, the UI
         -- counter, the cap logic, and list() keep working on real char counts, not ciphertext len.
         char_count  INTEGER NOT NULL DEFAULT 0,
+        -- key_id names which encryption key text/prev_text are under (NULL = stored plaintext,
+        -- e.g. dev/no-cipher). Enables lazy key rotation: rewrite under the new key on next write.
+        key_id      TEXT,
         is_shared   INTEGER NOT NULL DEFAULT 0,
         position    INTEGER NOT NULL,
         version     INTEGER NOT NULL DEFAULT 0,
@@ -132,13 +186,18 @@ export class Store {
       -- one row per signed-in human. google_sub is the stable Google account id (the OIDC 'sub').
       -- onboarded marks that sticky 1 was seeded once, so re-auth never re-injects the blurb.
       CREATE TABLE IF NOT EXISTS account (
-        user_id     TEXT PRIMARY KEY,
-        google_sub  TEXT NOT NULL UNIQUE,
-        email       TEXT,
-        onboarded   INTEGER NOT NULL DEFAULT 0,
-        created_at  TEXT NOT NULL,
-        updated_at  TEXT NOT NULL
+        user_id              TEXT PRIMARY KEY,
+        google_sub           TEXT NOT NULL UNIQUE,
+        email                TEXT,
+        onboarded            INTEGER NOT NULL DEFAULT 0,
+        -- sha256(raw connector token) for the user's OWN Claude. We store only the hash, never the
+        -- raw token. NULL until they generate one. Rotating = overwrite (the old token stops working).
+        connector_token_hash TEXT,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL
       );
+      CREATE UNIQUE INDEX IF NOT EXISTS account_connector_token
+        ON account(connector_token_hash) WHERE connector_token_hash IS NOT NULL;
     `);
   }
 
@@ -165,10 +224,11 @@ export class Store {
       if (opts.shared) {
         this.db.run("UPDATE sticky SET is_shared = 0 WHERE user_id = ? AND is_shared = 1", [userId]);
       }
+      const { stored, keyId } = this.encOut(text, userId);
       this.db.run(
-        `INSERT INTO sticky (id, user_id, text, prev_text, char_count, is_shared, position, version, created_at, updated_at)
-         VALUES (?, ?, ?, NULL, ?, ?, ?, 0, ?, ?)`,
-        [id, userId, text, text.length, opts.shared ? 1 : 0, n, ts, ts],
+        `INSERT INTO sticky (id, user_id, text, prev_text, char_count, key_id, is_shared, position, version, created_at, updated_at)
+         VALUES (?, ?, ?, NULL, ?, ?, ?, ?, 0, ?, ?)`,
+        [id, userId, stored, text.length, keyId, opts.shared ? 1 : 0, n, ts, ts],
       );
     });
     tx();
@@ -179,7 +239,7 @@ export class Store {
     const r = this.db
       .query<Row, [string, string]>("SELECT * FROM sticky WHERE user_id = ? AND id = ?")
       .get(userId, id);
-    return r ? rowToSticky(r) : null;
+    return r ? this.rowToSticky(r) : null;
   }
 
   // METADATA ONLY — no `text`. The privacy boundary; do not add text here. char_count is the
@@ -199,11 +259,30 @@ export class Store {
       }));
   }
 
+  // HUMAN-ONLY list: metadata + a derived title (first line / first ~30 chars). This DECRYPTS to
+  // compute the title, so it must NEVER be exposed over the MCP connector — only the signed-in
+  // human may see their own notes' titles. `list()` above stays the metadata-only connector path.
+  listWithTitles(userId: string): Array<StickyMeta & { title: string }> {
+    return this.db
+      .query<Row, [string]>("SELECT * FROM sticky WHERE user_id = ? ORDER BY position")
+      .all(userId)
+      .map((r) => {
+        const s = this.rowToSticky(r);
+        return {
+          id: s.id,
+          position: s.position,
+          char_count: s.char_count,
+          is_shared: s.is_shared,
+          title: deriveTitle(s.text),
+        };
+      });
+  }
+
   getShared(userId: string): Sticky | null {
     const r = this.db
       .query<Row, [string]>("SELECT * FROM sticky WHERE user_id = ? AND is_shared = 1")
       .get(userId);
-    return r ? rowToSticky(r) : null;
+    return r ? this.rowToSticky(r) : null;
   }
 
   // The ONE compare-and-swap every write path uses. Rejects on stale version or over-cap; stashes
@@ -216,11 +295,15 @@ export class Store {
       if (current.version !== expectedVersion) {
         throw new VersionConflictError(expectedVersion, current.version);
       }
+      // Encrypt both the new text AND the stashed old text under the CURRENT key, so the row's two
+      // columns always share one key_id (and a rotated key lazily re-encrypts the old value here).
+      const next = this.encOut(text, userId);
+      const prev = this.encOut(current.text, userId); // current.text is plaintext (decrypted on read)
       this.db.run(
         `UPDATE sticky
-         SET prev_text = text, text = ?, char_count = ?, version = version + 1, updated_at = ?
+         SET prev_text = ?, text = ?, char_count = ?, key_id = ?, version = version + 1, updated_at = ?
          WHERE user_id = ? AND id = ?`,
-        [text, text.length, this.now(), userId, id],
+        [prev.stored, next.stored, text.length, next.keyId, this.now(), userId, id],
       );
     });
     tx();
@@ -263,19 +346,37 @@ export class Store {
 
   getAccountByGoogleSub(googleSub: string): Account | null {
     const r = this.db
-      .query<
-        {
-          user_id: string;
-          google_sub: string;
-          email: string | null;
-          onboarded: number;
-          created_at: string;
-          updated_at: string;
-        },
-        [string]
-      >("SELECT * FROM account WHERE google_sub = ?")
+      .query<AccountRow, [string]>(
+        "SELECT user_id, google_sub, email, onboarded, created_at, updated_at FROM account WHERE google_sub = ?",
+      )
       .get(googleSub);
-    return r ? { ...r, onboarded: r.onboarded === 1 } : null;
+    return r ? accountRowToAccount(r) : null;
+  }
+
+  // Generate (or rotate) the user's connector token. Returns the RAW token ONCE — only its hash is
+  // stored, so it can never be retrieved again; regenerating overwrites (the old token stops working).
+  generateConnectorToken(userId: string): string {
+    const raw = `msk_${randomBytes(32).toString("base64url")}`;
+    const hash = sha256(raw);
+    const changed = this.db.run(
+      "UPDATE account SET connector_token_hash = ?, updated_at = ? WHERE user_id = ?",
+      [hash, this.now(), userId],
+    );
+    if (changed.changes === 0) throw new NotFoundError(`account ${userId}`);
+    return raw;
+  }
+
+  // Resolve a raw connector token to its owning userId via the stored hash (indexed lookup = the
+  // equality check). Returns null if no account has that token. The env bootstrap token is handled
+  // separately in app.ts (resolveToken), so Andrew's existing connector keeps working.
+  resolveConnectorToken(rawToken: string): string | null {
+    if (!rawToken) return null;
+    const r = this.db
+      .query<{ user_id: string }, [string]>(
+        "SELECT user_id FROM account WHERE connector_token_hash = ?",
+      )
+      .get(sha256(rawToken));
+    return r ? r.user_id : null;
   }
 
   // Sign-in entry point. Returns the existing account for a returning user (NO re-seeding — the
@@ -306,6 +407,14 @@ export class Store {
     tx();
     return { account: this.getAccountByGoogleSub(googleSub)!, created: true };
   }
+}
+
+// Derive a nav title from a sticky's text: first non-empty line, capped to ~30 chars. Empty → a
+// placeholder so the nav never shows a blank tab. Used by the human web nav only.
+export function deriveTitle(text: string, max = 30): string {
+  const firstLine = text.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+  if (!firstLine) return "Untitled";
+  return firstLine.length > max ? firstLine.slice(0, max - 1) + "…" : firstLine;
 }
 
 // Combine the pre-auth draft with the onboarding blurb without exceeding MAX_CHARS. The blurb is

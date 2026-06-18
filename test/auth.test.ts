@@ -76,11 +76,15 @@ test("a too-large draft cannot push sticky 1 over the cap on real signup", () =>
 
 // --- HTTP route /auth/google with a fake verifier ---
 
-function appWith(verify: (cred: string) => Promise<GoogleIdentity | null>) {
+function appWith(
+  verify: (cred: string) => Promise<GoogleIdentity | null>,
+  isAllowed: (id: GoogleIdentity) => boolean = () => true,
+) {
   const app = createApp({
     store,
     resolveToken: () => null,
     verifyGoogleToken: verify,
+    isAllowed,
   });
   const server = Bun.serve({ port: 0, fetch: app.fetch });
   return { server, base: `http://localhost:${server.port}` };
@@ -97,9 +101,11 @@ test("POST /auth/google: valid credential signs in, seeds, reports created", asy
       body: JSON.stringify({ credential: "good", draft: "my draft note" }),
     });
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { user_id: string; created: boolean };
+    const json = (await res.json()) as { ok: boolean; created: boolean };
     expect(json.created).toBe(true);
-    const shared = store.getShared(json.user_id)!;
+    // response no longer leaks the internal user_id — look the account up by its Google sub
+    const acct = store.getAccountByGoogleSub("sub-http")!;
+    const shared = store.getShared(acct.user_id)!;
     expect(shared.text).toContain("my draft note");
 
     // second call with the same sub → created:false, no re-seed
@@ -133,6 +139,57 @@ test("POST /auth/google: invalid credential → 401; missing → 400", async () 
       body: JSON.stringify({}),
     });
     expect(missing.status).toBe(400);
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("POST /auth/google: a non-allowlisted identity is rejected 403 and creates NOTHING", async () => {
+  const fake = async (): Promise<GoogleIdentity> => ({ sub: "stranger", email: "stranger@evil.com" });
+  // allow only andrew; the stranger above is not allowed
+  const { server, base } = appWith(fake, (id) => id.email === "andrew@ok.com");
+  try {
+    const res = await fetch(`${base}/auth/google`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credential: "valid-but-unwelcome", draft: "should not persist" }),
+    });
+    expect(res.status).toBe(403);
+    // crucial: no account/sticky was created for the rejected identity
+    expect(store.getAccountByGoogleSub("stranger")).toBeNull();
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("POST /auth/google: an allowlisted identity is admitted", async () => {
+  const fake = async (): Promise<GoogleIdentity> => ({ sub: "andrew", email: "andrew@ok.com" });
+  const { server, base } = appWith(fake, (id) => id.email === "andrew@ok.com");
+  try {
+    const res = await fetch(`${base}/auth/google`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credential: "ok" }),
+    });
+    expect(res.status).toBe(200);
+    expect(store.getAccountByGoogleSub("andrew")).not.toBeNull();
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("createApp defaults to deny-all sign-in when no allowlist is given", async () => {
+  const fake = async (): Promise<GoogleIdentity> => ({ sub: "anyone", email: "a@b.com" });
+  // build WITHOUT isAllowed → default deny-all
+  const app = createApp({ store, resolveToken: () => null, verifyGoogleToken: fake });
+  const server = Bun.serve({ port: 0, fetch: app.fetch });
+  try {
+    const res = await fetch(`http://localhost:${server.port}/auth/google`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ credential: "ok" }),
+    });
+    expect(res.status).toBe(403);
   } finally {
     server.stop(true);
   }

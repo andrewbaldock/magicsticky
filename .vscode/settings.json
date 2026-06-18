@@ -1,0 +1,7 @@
+{
+  // Stop VS Code's Git extension from writing to .git in the background. Its constant polling +
+  // periodic autofetch was racing with other git actors (Sourcetree, CLI) and orphaning
+  // .git/index.lock. Use the Source Control panel's manual refresh/fetch instead.
+  "git.autofetch": false,
+  "git.autorefresh": false
+}

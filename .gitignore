@@ -15,5 +15,5 @@ node_modules/
 *.log
 
 # scratch: out-of-band Claude Code <-> Cowork conversation, not project artifacts
-CONVO-CC.txt
-CONVO-CW.txt
+CONVO-CC*.txt
+CONVO-CW*.txt

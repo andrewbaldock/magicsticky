@@ -5,7 +5,7 @@
 //   MAGICSTICKY_DB     path to the SQLite file (default ./magicsticky.db; on Fly = volume path)
 //   MAGICSTICKY_TOKEN  the static connector bearer token (single-user MVP)
 //   MAGICSTICKY_USER   the userId that token maps to (default "andrew")
-//   PORT               listen port (default 3000)
+//   PORT               listen port (default 3001 locally; Fly sets 8080)
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -51,7 +51,8 @@ function tokenMatches(provided: string, expected: string): boolean {
 const dbPath = process.env.MAGICSTICKY_DB ?? "./magicsticky.db";
 const token = process.env.MAGICSTICKY_TOKEN;
 const userId = process.env.MAGICSTICKY_USER ?? "andrew";
-const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+// Local default 3001 (3000 is Orion's API; prod/Fly sets PORT=8080 via fly.toml).
+const port = process.env.PORT ? Number(process.env.PORT) : 3001;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 // Who may sign in (comma-separated). Single-user/demo allowlist — without it, sign-in is deny-all.
 const allowedSubs = (process.env.MAGICSTICKY_ALLOWED_SUBS ?? "")

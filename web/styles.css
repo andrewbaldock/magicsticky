@@ -61,9 +61,9 @@ body {
 /* ---- nav switcher: a horizontal scrollable tab strip (mobile-friendly) ---- */
 .nav {
   display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: calc(var(--safe-t) + 8px) 8px 8px;
+  gap: 4px;
+  align-items: flex-end; /* tabs sit on the baseline so they meet the sticky below */
+  padding: calc(var(--safe-t) + 8px) 8px 0; /* NO bottom padding — tabs butt against the sticky */
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -75,11 +75,12 @@ body {
 .tab {
   flex: 0 0 auto;
   max-width: 42vw;
-  min-height: var(--tap);
+  height: 38px;
+  margin-bottom: -2px; /* overlap the sticky top edge so the active tab reads as connected to it */
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: none;
   border-radius: 10px 10px 0 0;
   background: var(--sticky-edge);
@@ -90,11 +91,12 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 .tab.active {
-  background: var(--sticky);
+  background: var(--sticky); /* same yellow as the pane → visually one surface */
   opacity: 1;
+  padding-bottom: 2px; /* cover the 2px overlap so the active tab merges into the sticky */
 }
 .tab .tab-title {
   overflow: hidden;
@@ -109,10 +111,11 @@ body {
 }
 .tab-add {
   flex: 0 0 auto;
-  min-width: var(--tap);
-  min-height: var(--tap);
+  min-width: var(--tap); /* keep a 44px-wide tap target even though it's visually short */
+  height: 38px;
+  margin-bottom: 2px; /* align with the tab strip baseline */
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: #cfcabb;
   font-size: 22px;

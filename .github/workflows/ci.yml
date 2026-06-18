@@ -31,8 +31,9 @@ jobs:
       - name: Build web UI (E2E serves web/dist)
         run: bun run build:web
 
+      # The iPhone 14 project uses WebKit; Pixel 7 + Desktop Chrome use Chromium. Install both.
       - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium webkit
 
       - name: E2E (Playwright)
         run: bunx playwright test

@@ -247,6 +247,28 @@ body {
 .editor.reader ol {
   padding-left: 1.4em;
 }
+/* GFM task items: render as a clear ▢ / ✓ glyph (not a form checkbox). Non-interactive — the text
+   is the source of truth; toggle by editing. */
+.editor.reader li.md-task {
+  list-style: none;
+  margin-left: -1.2em; /* pull back so the glyph sits where the bullet would */
+  display: flex;
+  gap: 0.5em;
+}
+.editor.reader .md-check {
+  flex: 0 0 auto;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.editor.reader li.md-task--done {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: rgba(0, 0, 0, 0.3);
+}
+.editor.reader li.md-task--done .md-check {
+  color: var(--shared);
+  text-decoration: none;
+}
 .editor.reader code {
   background: rgba(0, 0, 0, 0.08);
   padding: 0.1em 0.35em;

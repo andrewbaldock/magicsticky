@@ -5,6 +5,7 @@ import { ConnectorSheet } from "./ConnectorSheet.tsx";
 import { StickyEditor } from "./StickyEditor.tsx";
 import { pastelFor } from "./palette.ts";
 import { OfflinePanel } from "./OfflinePanel.tsx";
+import { nextDelay, classifySaveError } from "./saveRetry.ts";
 import type { CSSProperties } from "react";
 
 // Inline CSS vars for a sticky's pastel color (drives both its tab and, when active, the pane).
@@ -15,8 +16,7 @@ function pastelVars(position: number): CSSProperties {
 
 const MAX_CHARS = 10_000;
 const SAVE_DEBOUNCE_MS = 700;
-const FIRST_RETRY_MS = 3_000; // backoff: 3s → 6s → 12s … capped
-const MAX_RETRY_MS = 30_000;
+// retry backoff/classification live in saveRetry.ts (unit-tested) — see nextDelay/classifySaveError.
 
 type SaveState = "idle" | "saving" | "saved" | "conflict" | "error";
 type PendingSave = { next: string; baseVersion: number; id: string };
@@ -30,7 +30,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
   const [showToken, setShowToken] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retryDelay = useRef(FIRST_RETRY_MS);
+  const retryAttempt = useRef(0); // # of consecutive failed save attempts → drives nextDelay()
   const pending = useRef<PendingSave | null>(null); // the latest unsaved edit (for retry/online flush)
 
   // Run an async action; on a 401 drop to signed-out, on any other error flag a save error rather
@@ -87,17 +87,19 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
       try {
         const updated = await api.saveSticky(id, next, baseVersion);
         pending.current = null;
-        retryDelay.current = FIRST_RETRY_MS;
+        retryAttempt.current = 0;
         setCurrent(updated);
         setSave("saved");
         refreshList(); // nav title (first line) may have changed
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) {
+        const outcome = classifySaveError(e);
+        if (outcome === "signout") {
           onSignedOut(); // auth, not connectivity — don't retry
           return;
         }
-        if (e instanceof ApiError && e.status === 409) {
+        if (outcome === "conflict") {
           // someone else wrote since our base version; adopt theirs and re-save our text on top
+          retryAttempt.current = 0;
           const latest = await api.getSticky(id).catch(() => null);
           if (latest) {
             setCurrent(latest);
@@ -110,11 +112,12 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
         pending.current = { next, baseVersion, id };
         setSave("error");
         if (retryTimer.current) clearTimeout(retryTimer.current);
+        const delay = nextDelay(retryAttempt.current);
+        retryAttempt.current += 1;
         retryTimer.current = setTimeout(() => {
           const p = pending.current;
           if (p) void performSave(p.next, p.baseVersion, p.id);
-        }, retryDelay.current);
-        retryDelay.current = Math.min(retryDelay.current * 2, MAX_RETRY_MS);
+        }, delay);
       }
     },
     [refreshList, onSignedOut],
@@ -140,7 +143,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
       const p = pending.current;
       if (p) {
         if (retryTimer.current) clearTimeout(retryTimer.current);
-        retryDelay.current = FIRST_RETRY_MS;
+        retryAttempt.current = 0; // connection's back — retry promptly, not at the backed-off delay
         void performSave(p.next, p.baseVersion, p.id);
       }
     };

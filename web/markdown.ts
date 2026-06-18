@@ -6,12 +6,30 @@
 // output MUST be sanitized. We parse with GFM (bare URLs autolink) then DOMPurify the HTML, and add
 // target/rel to links via a hook so taps open safely in a new tab.
 
-import { marked } from "marked";
+import { marked, type Tokens } from "marked";
 import DOMPurify from "dompurify";
 
 marked.setOptions({
   gfm: true, // GitHub-flavored: autolinks bare URLs, tables, etc.
   breaks: true, // a single newline becomes <br> (matches how people type in a note)
+});
+
+// GFM task items (- [ ] / - [x]) render as raw <input type=checkbox> by default — which looks
+// broken in a sticky (unstyled boxes, and they wrongly appear interactive). Render them as a styled,
+// NON-interactive glyph instead so done (✓) vs to-do (▢) is visually clear and matches the read view.
+marked.use({
+  renderer: {
+    listitem(item: Tokens.ListItem) {
+      const body = this.parser.parse(item.tokens);
+      if (!item.task) return `<li>${body}</li>`;
+      // marked injects a raw <input type=checkbox> at the start of a task item's body — strip it
+      // and replace with our own non-interactive glyph (▢ / ✓).
+      const stripped = body.replace(/^\s*<input[^>]*>\s*/i, "");
+      const cls = item.checked ? "md-task md-task--done" : "md-task";
+      const glyph = item.checked ? "✓" : "▢";
+      return `<li class="${cls}"><span class="md-check" aria-hidden="true">${glyph}</span>${stripped}</li>`;
+    },
+  },
 });
 
 // Make every rendered link open in a new tab without leaking the opener. NOTE: this hook is global

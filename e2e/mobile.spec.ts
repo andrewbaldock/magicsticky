@@ -84,6 +84,19 @@ test("markdown read view: a bare URL renders as a clickable link; raw HTML is sa
   expect(html).not.toContain("onerror");
 });
 
+test("markdown task items render as ▢/✓ glyphs, not form checkboxes", async ({ page }) => {
+  await signIn(page, "## To do\n- [ ] open task\n- [x] finished task");
+  await page.goto("/");
+  const reader = page.locator(".editor.reader");
+  await reader.waitFor();
+  const html = await reader.innerHTML();
+  expect(html).not.toContain("<input"); // no raw form checkbox
+  await expect(reader.locator("li.md-task")).toHaveCount(2);
+  await expect(reader.locator("li.md-task--done")).toHaveCount(1); // the [x] one
+  await expect(reader).toContainText("✓");
+  await expect(reader).toContainText("▢");
+});
+
 test("PWA: manifest + icons are served (installable), index links them", async ({ page, request }) => {
   // the manifest serves as JSON with icons (not the SPA fallback HTML)
   const m = await request.get("/manifest.webmanifest");

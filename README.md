@@ -10,7 +10,9 @@ connector token. The whole product is the discipline of staying a sticky note.
 ## Architecture
 ![magicsticky architecture](./docs/architecture.drawio.svg)
 
-The diagram is an editable [draw.io](https://app.diagrams.net) file — open
+See **[docs/architecture.md](./docs/architecture.md)** for the written architecture reference
+(auth paths, data model, the load-bearing invariants, PWA/offline, deploy). The diagram above is an
+editable [draw.io](https://app.diagrams.net) file — open
 [`docs/architecture.drawio.svg`](./docs/architecture.drawio.svg) in the draw.io desktop app, the
 VS Code extension, or app.diagrams.net to edit it.
 
@@ -49,6 +51,7 @@ pointing at `https://<host>/mcp` with `Authorization: Bearer <token>`. Then call
 load your shared sticky as context.
 
 ## Docs
+- **[docs/architecture.md](./docs/architecture.md)** — architecture reference (+ the draw.io diagram beside it).
 - **[plans/phase2-hosted-oauth.md](./plans/phase2-hosted-oauth.md)** — the current, authoritative design + build plan.
 - **[SPEC.md](./SPEC.md)** / **[CLAUDE.md](./CLAUDE.md)** / **[NEXT.md](./NEXT.md)** — earlier
   Phase-0/1 docs. **Superseded in places by the pivot** (they describe a 9-tool focus+item model

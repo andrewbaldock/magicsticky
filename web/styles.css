@@ -160,7 +160,7 @@ body {
   transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px; /* words hug the daisy */
   pointer-events: none;
   color: var(--sticky-ink, var(--ink));
   white-space: nowrap;
@@ -168,8 +168,16 @@ body {
 .head-brand__text {
   font-family: "Julius Sans One", sans-serif;
   font-size: 15px;
-  letter-spacing: 0.02em; /* Julius Sans One is already wide — keep it tight */
+  /* Julius Sans One is CAPS-ONLY — lowercase renders as small-caps (uneven letter
+     sizes). Force uppercase so every letter is a uniform full-size cap. */
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   line-height: 1;
+}
+/* The daisy SVG carries transparent padding in its viewBox; pull the words in so they
+   hug the flower. (The Daisy component sits between the two .head-brand__text spans.) */
+.head-brand svg {
+  margin: 0 -5px;
 }
 /* On narrow phones the lozenge + buttons can crowd the center — hide the text, keep the daisy. */
 @media (max-width: 420px) {

@@ -275,8 +275,9 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
           {/* Brand mark, absolutely centered so it stays dead-center regardless of the lozenge
               width on the left or the button cluster on the right. */}
           <span className="head-brand" aria-hidden="true">
+            <span className="head-brand__text">Magic</span>
             <Daisy size={22} />
-            <span className="head-brand__text">Magic Sticky</span>
+            <span className="head-brand__text">Sticky</span>
           </span>
           <button
             className={`lozenge${current?.is_shared ? " is-shared" : ""}`}

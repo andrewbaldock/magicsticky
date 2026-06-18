@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1180" height="760" viewBox="0 0 1180 760" content="&lt;mxGraphModel dx=&quot;1180&quot; dy=&quot;760&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; guides=&quot;1&quot; tooltips=&quot;1&quot; connect=&quot;1&quot; arrows=&quot;1&quot; fold=&quot;1&quot; page=&quot;1&quot; pageScale=&quot;1&quot; pageWidth=&quot;1180&quot; pageHeight=&quot;760&quot; math=&quot;0&quot; shadow=&quot;0&quot;&gt;&#10;  &lt;root&gt;&#10;    &lt;mxCell id=&quot;0&quot;/&gt;&#10;    &lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&#10;    &lt;mxCell id=&quot;title&quot; value=&quot;magicsticky — architecture&quot; style=&quot;text;html=1;fontSize=20;fontStyle=1;align=left;verticalAlign=middle;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;40&quot; y=&quot;16&quot; width=&quot;400&quot; height=&quot;30&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;a_browser&quot; value=&quot;Human Browser&amp;#10;(phone-first web app)&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;40&quot; y=&quot;110&quot; width=&quot;180&quot; height=&quot;60&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;a_claude&quot; value=&quot;Claude / LLM&amp;#10;(custom MCP connector)&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;40&quot; y=&quot;360&quot; width=&quot;180&quot; height=&quot;60&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;a_google&quot; value=&quot;Google OAuth&amp;#10;(identity provider)&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#E65100;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;40&quot; y=&quot;600&quot; width=&quot;180&quot; height=&quot;60&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;flyapp&quot; value=&quot;Fly app · Bun · port 8080&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#E3F2FD;strokeColor=#1565C0;fontStyle=1;fontSize=13;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;320&quot; y=&quot;90&quot; width=&quot;800&quot; height=&quot;520&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;hono&quot; value=&quot;Hono router&amp;#10;src/app.ts&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#BBDEFB;strokeColor=#1565C0;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;flyapp&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;40&quot; width=&quot;360&quot; height=&quot;300&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;r_spa&quot; value=&quot;GET /*  →  React SPA (web/dist)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=11;&quot; vertex=&quot;1&quot; parent=&quot;hono&quot;&gt;&lt;mxGeometry x=&quot;16&quot; y=&quot;36&quot; width=&quot;328&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;r_auth&quot; value=&quot;POST /auth/google  (no auth → issues session)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=11;&quot; vertex=&quot;1&quot; parent=&quot;hono&quot;&gt;&lt;mxGeometry x=&quot;16&quot; y=&quot;72&quot; width=&quot;328&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;r_api&quot; value=&quot;/api/*  (session cookie)&amp;#10;list · read · save(CAS) · share · undo · connector-token · export · delete-everything&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=11;&quot; vertex=&quot;1&quot; parent=&quot;hono&quot;&gt;&lt;mxGeometry x=&quot;16&quot; y=&quot;108&quot; width=&quot;328&quot; height=&quot;56&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;r_mcp&quot; value=&quot;/mcp  (Bearer token · Streamable HTTP)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=11;&quot; vertex=&quot;1&quot; parent=&quot;hono&quot;&gt;&lt;mxGeometry x=&quot;16&quot; y=&quot;172&quot; width=&quot;328&quot; height=&quot;28&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;mcp&quot; value=&quot;MCP server  ·  src/mcp.ts&amp;#10;(stateless, per-request)&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#BBDEFB;strokeColor=#1565C0;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;flyapp&quot;&gt;&lt;mxGeometry x=&quot;420&quot; y=&quot;40&quot; width=&quot;360&quot; height=&quot;130&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;t_whoami&quot; value=&quot;whoami&amp;#10;(read shared)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;mcp&quot;&gt;&lt;mxGeometry x=&quot;14&quot; y=&quot;46&quot; width=&quot;80&quot; height=&quot;68&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;t_write&quot; value=&quot;write&amp;#10;(CAS)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;mcp&quot;&gt;&lt;mxGeometry x=&quot;102&quot; y=&quot;46&quot; width=&quot;80&quot; height=&quot;68&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;t_list&quot; value=&quot;list_stickies&amp;#10;(metadata only)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;mcp&quot;&gt;&lt;mxGeometry x=&quot;190&quot; y=&quot;46&quot; width=&quot;80&quot; height=&quot;68&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;t_share&quot; value=&quot;set_shared&amp;#10;(flip flag)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;mcp&quot;&gt;&lt;mxGeometry x=&quot;278&quot; y=&quot;46&quot; width=&quot;80&quot; height=&quot;68&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;authgrp&quot; value=&quot;Auth / Crypto&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#BBDEFB;strokeColor=#1565C0;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;flyapp&quot;&gt;&lt;mxGeometry x=&quot;420&quot; y=&quot;200&quot; width=&quot;360&quot; height=&quot;130&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;c_session&quot; value=&quot;session.ts&amp;#10;HMAC cookie&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;authgrp&quot;&gt;&lt;mxGeometry x=&quot;14&quot; y=&quot;40&quot; width=&quot;104&quot; height=&quot;74&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;c_http&quot; value=&quot;server-http.ts&amp;#10;JWT verify + allowlist&amp;#10;+ token resolve&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;authgrp&quot;&gt;&lt;mxGeometry x=&quot;128&quot; y=&quot;40&quot; width=&quot;104&quot; height=&quot;74&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;c_crypto&quot; value=&quot;crypto.ts&amp;#10;AES-256-GCM&amp;#10;(user_id as AAD)&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#1565C0;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;authgrp&quot;&gt;&lt;mxGeometry x=&quot;242&quot; y=&quot;40&quot; width=&quot;104&quot; height=&quot;74&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;store&quot; value=&quot;Store · src/db.ts&amp;#10;bun:sqlite (WAL)&quot; style=&quot;shape=cylinder3;boundedLbl=1;backgroundOutline=1;html=1;whiteSpace=wrap;verticalAlign=top;fillColor=#C8E6C9;strokeColor=#2E7D32;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;flyapp&quot;&gt;&lt;mxGeometry x=&quot;20&quot; y=&quot;360&quot; width=&quot;360&quot; height=&quot;140&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;tbl_sticky&quot; value=&quot;sticky&amp;#10;text · prev_text · is_shared (unique/user)&amp;#10;version (CAS) · key_id · position&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;store&quot;&gt;&lt;mxGeometry x=&quot;18&quot; y=&quot;54&quot; width=&quot;324&quot; height=&quot;42&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;tbl_account&quot; value=&quot;account&amp;#10;google_sub · email · connector_token_hash&quot; style=&quot;rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#2E7D32;fontSize=10;&quot; vertex=&quot;1&quot; parent=&quot;store&quot;&gt;&lt;mxGeometry x=&quot;18&quot; y=&quot;100&quot; width=&quot;324&quot; height=&quot;32&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_b_auth&quot; value=&quot;HTTPS · Google ID token&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;a_browser&quot; target=&quot;r_auth&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_b_api&quot; value=&quot;HTTPS REST · session cookie (CAS on write)&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;a_browser&quot; target=&quot;r_api&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_b_spa&quot; value=&quot;HTML/JS · React bundle&quot; style=&quot;endArrow=classic;html=1;dashed=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;r_spa&quot; target=&quot;a_browser&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_c_mcp&quot; value=&quot;Streamable HTTP · Bearer token&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;a_claude&quot; target=&quot;r_mcp&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_mcp_srv&quot; value=&quot;per-request&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;r_mcp&quot; target=&quot;mcp&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_mcp_store&quot; value=&quot;version CAS&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;mcp&quot; target=&quot;store&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_api_store&quot; value=&quot;version CAS&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;r_api&quot; target=&quot;store&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_auth_store&quot; style=&quot;endArrow=classic;html=1;dashed=1;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;authgrp&quot; target=&quot;store&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;e_http_google&quot; value=&quot;HTTPS · jwks JWT verify&quot; style=&quot;endArrow=classic;html=1;fontSize=10;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;c_http&quot; target=&quot;a_google&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;    &lt;mxCell id=&quot;note&quot; value=&quot;Invariants: stateless MCP · optimistic version CAS lets human + Claude edit safely · list_stickies is metadata-only (privacy boundary) · AES-256-GCM at rest (user_id as AAD) · single-machine scale (SQLite on Fly volume /data).&quot; style=&quot;text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fillColor=#F5F5F5;strokeColor=#9E9E9E;fontSize=11;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;320&quot; y=&quot;630&quot; width=&quot;800&quot; height=&quot;90&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&#10;  &lt;/root&gt;&#10;&lt;/mxGraphModel&gt;">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#333333"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="1180" height="760" fill="#ffffff"/>
+  <text x="40" y="40" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#222">magicsticky — architecture</text>
+
+  <!-- Edges (drawn first, under boxes) -->
+  <g font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#333">
+    <!-- Browser -> /auth/google -->
+    <path d="M220,140 L260,140 L260,202 L336,202" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="262" y="135">HTTPS · Google ID token</text>
+    <!-- Browser -> /api -->
+    <path d="M220,150 L240,150 L240,250 L336,250" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="242" y="178">HTTPS REST · session cookie (CAS)</text>
+    <!-- SPA -> Browser (dashed) -->
+    <path d="M336,166 L280,166 L280,120 L220,120" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+    <text x="232" y="100">HTML/JS · React bundle</text>
+    <!-- Claude -> /mcp -->
+    <path d="M220,390 L280,390 L280,302 L336,302" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="222" y="345">Streamable HTTP · Bearer token</text>
+    <!-- /mcp -> MCP server -->
+    <path d="M700,302 L730,302 L730,200 L760,200" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="708" y="262">per-request</text>
+    <!-- MCP server -> store -->
+    <path d="M760,255 L590,255 L590,460" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="595" y="420">version CAS</text>
+    <!-- /api -> store -->
+    <path d="M520,360 L520,460" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="525" y="430">version CAS</text>
+    <!-- auth group -> store (dashed) -->
+    <path d="M760,420 L660,420 L660,470" fill="none" stroke="#333" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+    <!-- server-http -> Google -->
+    <path d="M868,400 L868,560 L260,560 L260,640 L220,640" fill="none" stroke="#333" stroke-width="1.5" marker-end="url(#arrow)"/>
+    <text x="300" y="555">HTTPS · jwks JWT verify</text>
+  </g>
+
+  <!-- Actors -->
+  <g font-family="Helvetica, Arial, sans-serif">
+    <rect x="40" y="110" width="180" height="60" rx="8" fill="#FFE0B2" stroke="#E65100" stroke-width="1.5"/>
+    <text x="130" y="135" text-anchor="middle" font-size="12" font-weight="bold" fill="#3e2700">Human Browser</text>
+    <text x="130" y="152" text-anchor="middle" font-size="10" fill="#3e2700">(phone-first web app)</text>
+
+    <rect x="40" y="360" width="180" height="60" rx="8" fill="#FFE0B2" stroke="#E65100" stroke-width="1.5"/>
+    <text x="130" y="385" text-anchor="middle" font-size="12" font-weight="bold" fill="#3e2700">Claude / LLM</text>
+    <text x="130" y="402" text-anchor="middle" font-size="10" fill="#3e2700">(custom MCP connector)</text>
+
+    <rect x="40" y="610" width="180" height="60" rx="8" fill="#FFE0B2" stroke="#E65100" stroke-width="1.5"/>
+    <text x="130" y="635" text-anchor="middle" font-size="12" font-weight="bold" fill="#3e2700">Google OAuth</text>
+    <text x="130" y="652" text-anchor="middle" font-size="10" fill="#3e2700">(identity provider)</text>
+  </g>
+
+  <!-- Fly app container -->
+  <g font-family="Helvetica, Arial, sans-serif">
+    <rect x="320" y="90" width="800" height="520" rx="10" fill="#E3F2FD" stroke="#1565C0" stroke-width="1.5"/>
+    <text x="336" y="110" font-size="13" font-weight="bold" fill="#0d47a1">Fly app · Bun · port 8080</text>
+
+    <!-- Hono router -->
+    <rect x="336" y="124" width="360" height="240" rx="8" fill="#BBDEFB" stroke="#1565C0" stroke-width="1.5"/>
+    <text x="352" y="142" font-size="12" font-weight="bold" fill="#0d47a1">Hono router · src/app.ts</text>
+    <rect x="352" y="150" width="328" height="26" fill="#fff" stroke="#1565C0"/>
+    <text x="360" y="167" font-size="11" fill="#222">GET /*  →  React SPA (web/dist)</text>
+    <rect x="352" y="190" width="328" height="26" fill="#fff" stroke="#1565C0"/>
+    <text x="360" y="207" font-size="11" fill="#222">POST /auth/google  (no auth → issues session)</text>
+    <rect x="352" y="230" width="328" height="42" fill="#fff" stroke="#1565C0"/>
+    <text x="360" y="246" font-size="11" fill="#222">/api/*  (session cookie)</text>
+    <text x="360" y="262" font-size="9.5" fill="#444">list · read · save(CAS) · share · undo · token · export · delete</text>
+    <rect x="352" y="290" width="328" height="26" fill="#fff" stroke="#1565C0"/>
+    <text x="360" y="307" font-size="11" fill="#222">/mcp  (Bearer token · Streamable HTTP)</text>
+
+    <!-- MCP server -->
+    <rect x="760" y="124" width="344" height="130" rx="8" fill="#BBDEFB" stroke="#1565C0" stroke-width="1.5"/>
+    <text x="776" y="142" font-size="12" font-weight="bold" fill="#0d47a1">MCP server · src/mcp.ts</text>
+    <text x="776" y="156" font-size="9.5" fill="#444">(stateless, per-request)</text>
+    <rect x="774" y="166" width="78" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="813" y="200" text-anchor="middle" font-size="10" fill="#222">whoami</text>
+    <text x="813" y="214" text-anchor="middle" font-size="8.5" fill="#444">(read shared)</text>
+    <rect x="858" y="166" width="78" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="897" y="200" text-anchor="middle" font-size="10" fill="#222">write</text>
+    <text x="897" y="214" text-anchor="middle" font-size="8.5" fill="#444">(CAS)</text>
+    <rect x="942" y="166" width="78" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="981" y="196" text-anchor="middle" font-size="9.5" fill="#222">list_stickies</text>
+    <text x="981" y="210" text-anchor="middle" font-size="8.5" fill="#444">(metadata only)</text>
+    <rect x="1026" y="166" width="70" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="1061" y="196" text-anchor="middle" font-size="9.5" fill="#222">set_shared</text>
+    <text x="1061" y="210" text-anchor="middle" font-size="8.5" fill="#444">(flip flag)</text>
+
+    <!-- Auth / Crypto -->
+    <rect x="760" y="284" width="344" height="130" rx="8" fill="#BBDEFB" stroke="#1565C0" stroke-width="1.5"/>
+    <text x="776" y="302" font-size="12" font-weight="bold" fill="#0d47a1">Auth / Crypto</text>
+    <rect x="774" y="324" width="104" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="826" y="356" text-anchor="middle" font-size="10" fill="#222">session.ts</text>
+    <text x="826" y="370" text-anchor="middle" font-size="8.5" fill="#444">HMAC cookie</text>
+    <rect x="888" y="324" width="104" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="940" y="350" text-anchor="middle" font-size="10" fill="#222">server-http.ts</text>
+    <text x="940" y="364" text-anchor="middle" font-size="8.5" fill="#444">JWT verify +</text>
+    <text x="940" y="376" text-anchor="middle" font-size="8.5" fill="#444">allowlist + token</text>
+    <rect x="1002" y="324" width="94" height="76" fill="#fff" stroke="#1565C0"/>
+    <text x="1049" y="350" text-anchor="middle" font-size="10" fill="#222">crypto.ts</text>
+    <text x="1049" y="364" text-anchor="middle" font-size="8.5" fill="#444">AES-256-GCM</text>
+    <text x="1049" y="376" text-anchor="middle" font-size="8.5" fill="#444">(user_id AAD)</text>
+
+    <!-- Store cylinder -->
+    <g>
+      <path d="M336,470 a174,14 0 0,1 348,0 v110 a174,14 0 0,1 -348,0 z" fill="#C8E6C9" stroke="#2E7D32" stroke-width="1.5"/>
+      <path d="M336,470 a174,14 0 0,0 348,0" fill="none" stroke="#2E7D32" stroke-width="1.5"/>
+      <text x="510" y="462" text-anchor="middle" font-size="12" font-weight="bold" fill="#1b5e20">Store · src/db.ts · bun:sqlite (WAL)</text>
+      <rect x="356" y="498" width="308" height="40" fill="#fff" stroke="#2E7D32"/>
+      <text x="510" y="514" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">sticky</text>
+      <text x="510" y="528" text-anchor="middle" font-size="8.5" fill="#444">text · prev_text · is_shared(uniq/user) · version(CAS) · key_id</text>
+      <rect x="356" y="544" width="308" height="30" fill="#fff" stroke="#2E7D32"/>
+      <text x="510" y="558" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">account</text>
+      <text x="510" y="569" text-anchor="middle" font-size="8.5" fill="#444">google_sub · email · connector_token_hash</text>
+    </g>
+  </g>
+
+  <!-- Invariants note -->
+  <g font-family="Helvetica, Arial, sans-serif">
+    <rect x="320" y="630" width="800" height="90" rx="6" fill="#F5F5F5" stroke="#9E9E9E" stroke-width="1"/>
+    <text x="334" y="652" font-size="11" font-weight="bold" fill="#333">Invariants</text>
+    <text x="334" y="670" font-size="11" fill="#444">· stateless MCP   · optimistic version CAS lets human + Claude edit safely   · list_stickies is metadata-only (privacy)</text>
+    <text x="334" y="688" font-size="11" fill="#444">· AES-256-GCM at rest (user_id as AAD)   · single-machine scale: SQLite on Fly volume /data</text>
+    <text x="334" y="706" font-size="10" fill="#777">Frontend: web/ (React 19 + Vite) — dev :5180 proxies /api + /auth → :3000; built into web/dist, served by Hono in prod.</text>
+  </g>
+</svg>

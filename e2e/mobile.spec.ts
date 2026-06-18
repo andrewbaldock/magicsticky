@@ -34,10 +34,15 @@ test("full flow: sign in → sticky-1 titled from draft → edit/counter → add
   await expect(firstTab).toContainText("interview prep");
   await expect(firstTab.locator(".shared-dot")).toBeVisible();
 
-  // the editor holds the draft; the lozenge says it's shared
-  const editor = page.locator(".editor");
-  await expect(editor).toHaveValue(/interview prep/);
+  // a sticky with content opens in the RENDERED read view (markdown); the draft shows there
+  const reader = page.locator(".editor.reader");
+  await expect(reader).toContainText("interview prep");
   await expect(page.locator(".lozenge.is-shared")).toContainText("Shared prompt");
+
+  // tap to edit → the textarea takes over holding the raw text
+  await reader.click();
+  const editor = page.locator("textarea.editor");
+  await expect(editor).toHaveValue(/interview prep/);
 
   // type and see the counter; assert the SETTLED save state (not the transient "Saving…", which a
   // 700ms debounce can flash past faster than the test samples).
@@ -57,6 +62,26 @@ test("full flow: sign in → sticky-1 titled from draft → edit/counter → add
   await page.getByRole("button", { name: "Connect a Claude" }).click();
   await page.getByRole("button", { name: "Generate token" }).click();
   await expect(page.locator(".token-box code")).toContainText("msk_");
+});
+
+test("markdown read view: a bare URL renders as a clickable link; raw HTML is sanitized", async ({
+  page,
+}) => {
+  // sign in with content so we open in read mode
+  await signIn(page, "see https://example.com/x and <img src=x onerror=alert(1)>");
+  await page.goto("/");
+  const reader = page.locator(".editor.reader");
+  await reader.waitFor();
+
+  // the bare URL became an anchor (GFM autolink), opening safely in a new tab
+  const link = reader.locator('a[href="https://example.com/x"]');
+  await expect(link).toHaveCount(1);
+  await expect(link).toHaveAttribute("rel", /noopener/);
+  await expect(link).toHaveAttribute("target", "_blank");
+
+  // the injected <img onerror> was sanitized away — no event handler survives
+  const html = await reader.innerHTML();
+  expect(html).not.toContain("onerror");
 });
 
 test("MOBILE: no horizontal overflow; editor fits the viewport", async ({ page }) => {

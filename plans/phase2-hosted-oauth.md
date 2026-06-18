@@ -152,8 +152,24 @@ size bound.
    (the dogfood jobhunt content) — flatten its items into one text blob — into its OWN slot (e.g.
    sticky 2), NOT sticky 1 (step 3 already seeded that with the pre-auth draft + onboarding). Do
    NOT auto-flip `is_shared` to the imported slot. VERIFIED. Don't launch empty.
-8. **Fly deploy**: volume, `/healthz` + smoke, custom domain via A Small Orange, certs,
-   `min_machines_running=1`.
+8. **Fly deploy** — CONFIG BUILT (Dockerfile, fly.toml, .dockerignore). Multi-stage Docker: build
+   web/dist (VITE_GOOGLE_CLIENT_ID as a public --build-arg) → runtime = prod deps + src + web/dist,
+   one Bun process serving PWA+/api+/mcp. SQLite on a Fly volume at /data. Verified: build:web runs,
+   prod refuses boot without MAGICSTICKY_KEYS (exit 1). Docker not installed locally → image not
+   built here; Fly builds remotely. **Go-live runbook (Cowork owns the DNS/cutover write-up):**
+   ```
+   fly launch --no-deploy            # creates app "magicsticky", get the <app>.fly.dev hostname
+   fly volumes create magicsticky_data --region sjc --size 1
+   fly secrets set MAGICSTICKY_TOKEN=… MAGICSTICKY_SESSION_SECRET=… MAGICSTICKY_KEYS=v1:… \
+       GOOGLE_CLIENT_ID=…apps.googleusercontent.com MAGICSTICKY_ALLOWED_EMAILS=andrewbaldock3@gmail.com
+   fly deploy --build-arg VITE_GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+   # → CNAME magicsticky → <app>.fly.dev at A Small Orange (Chrome-Claude; DNS-only, NO proxy)
+   fly certs add magicsticky.andrewbaldock.com      # + any _acme-challenge CNAME it prints
+   # → add https://magicsticky.andrewbaldock.com to the Google OAuth client JS origins
+   # → MIGRATE (once, prod keys) BEFORE first public sign-in:
+   #   bun run scripts/migrate-store.ts --user <andrew's userId after he signs in once> --shared <slug>
+   ```
+   ALWAYS ask Andrew before running fly (his rule). Cowork wants to eyeball final fly.toml + cutover.
 9. **Spec rewrite** (do as part of the build, lands with code):
    - §1 pitch: drop "running-list"; it's "a small stack of sticky notes, one is the shared context."
    - §2/§3: drop focus+items; "a sticky = free-text ≤10k; you hold ~10; one is the shared prompt."
@@ -188,6 +204,18 @@ size bound.
 - **NOT done (deferred): step 8 Fly deploy**, and the **PWA surface** (manifest/icons/apple-touch/
   service worker) — that's Phase 3 per SPEC. rekeyAll(userId) still deferred (key-compromise path).
 - Suite: backend 55/55, web tsc clean, Playwright 12/12.
+
+## Editor: markdown-by-convention (Andrew, 2026-06-18)
+A sticky stays ONE PLAIN-TEXT blob in storage (no rich-text data model) — but the human editor is
+nicer than a bare textarea: it renders **markdown** in a read view and is a raw textarea when
+editing. Manifesto-safe because markdown IS plain text; Claude still reads the raw text via whoami.
+- `web/markdown.ts`: `marked` (GFM → bare URLs autolink) + DOMPurify sanitize (untrusted input;
+  strips raw HTML / `javascript:`; links forced to `target=_blank rel=noopener`, only http(s)/mailto).
+- `web/StickyEditor.tsx`: tap-to-edit / blur-to-read single surface. Opens in READ mode if the
+  sticky has content, EDIT mode if empty. Keyed on sticky id (+ gated on loaded text) so it mounts
+  in the right mode per sticky. Storage = raw markdown; `onChange` gets raw text.
+- Deps: `marked`, `dompurify`. E2E proves a bare URL → clickable `<a rel=noopener>` and that an
+  injected `<img onerror>` is sanitized away. NOT rich-text: no toolbar, no WYSIWYG, no stored HTML.
 
 ## Risks
 - **`write` concurrency** is THE risk (two writers on the shared sticky) — mitigated by step-1

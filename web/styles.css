@@ -191,6 +191,70 @@ body {
   padding: 16px;
   min-height: 0;
 }
+
+/* Read view: rendered markdown in the same box; scrolls, tappable to edit. */
+.editor.reader {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  cursor: text;
+  white-space: normal;
+}
+.editor.reader > :first-child {
+  margin-top: 0;
+}
+.editor.reader h1,
+.editor.reader h2,
+.editor.reader h3 {
+  line-height: 1.25;
+  margin: 0.8em 0 0.3em;
+}
+.editor.reader h1 {
+  font-size: 1.5em;
+}
+.editor.reader h2 {
+  font-size: 1.25em;
+}
+.editor.reader h3 {
+  font-size: 1.1em;
+}
+.editor.reader p,
+.editor.reader ul,
+.editor.reader ol,
+.editor.reader blockquote,
+.editor.reader pre {
+  margin: 0 0 0.7em;
+}
+.editor.reader ul,
+.editor.reader ol {
+  padding-left: 1.4em;
+}
+.editor.reader code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.editor.reader pre {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.editor.reader pre code {
+  background: none;
+  padding: 0;
+}
+.editor.reader blockquote {
+  border-left: 3px solid rgba(0, 0, 0, 0.2);
+  padding-left: 12px;
+  color: var(--muted);
+}
+.editor.reader a {
+  word-break: break-word;
+}
+.editor.reader:focus {
+  outline: none;
+}
 .counter {
   padding: 6px 16px calc(var(--safe-b) + 8px);
   font-size: 13px;

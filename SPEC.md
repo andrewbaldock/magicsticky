@@ -31,7 +31,7 @@ Two faces of the same idea:
 7. **Saying no is the work.** The roadmap is mostly a list of things we refuse to build.
 
 ## 4. What it is NOT (anti-scope — keep this list growing)
-No folders or nesting *between* stickies (they stay a flat set). No rich text. No sharing/collaboration (maybe per-sticky read links later — see open questions). No reminder/notification engine. No recurring tasks. No tag taxonomy. No attachments. No calendar. No integrations marketplace. No AI features inside the app (the AI is the *client*, not a feature). When one of these starts to feel necessary, write it here instead of building it.
+No folders or nesting *between* stickies (they stay a flat set). No rich text *as a data model* — the web view renders **markdown** (markdown-by-convention; storage stays ONE plain-text blob, and Claude reads the raw text), but there is NO rich-text editor / WYSIWYG / stored HTML. No sharing/collaboration (maybe per-sticky read links later — see open questions). No reminder/notification engine. No recurring tasks. No tag taxonomy. No attachments. No calendar. No integrations marketplace. No AI features inside the app (the AI is the *client*, not a feature). When one of these starts to feel necessary, write it here instead of building it.
 
 ## 5. Mental model
 - A **sticky** is the unit. It has a **URL** (you pick the slug — claiming a URL *is* creating a sticky: `magicsticky.app/jobhunt`, `…/house`, `…/aether`), a **focus** (one short string, overwritten as things change), and a **list** (flat set of items).

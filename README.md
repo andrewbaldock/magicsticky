@@ -7,6 +7,13 @@ note every Claude you connect reads (and can update) over MCP, so each AI you ta
 current context. You reach the notes from a phone-first web app; a Claude reaches them through one
 connector token. The whole product is the discipline of staying a sticky note.
 
+## Architecture
+![magicsticky architecture](./docs/architecture.drawio.svg)
+
+The diagram is an editable [draw.io](https://app.diagrams.net) file — open
+[`docs/architecture.drawio.svg`](./docs/architecture.drawio.svg) in the draw.io desktop app, the
+VS Code extension, or app.diagrams.net to edit it.
+
 ## Model
 - A **sticky** is one free-text blob, ≤10,000 chars. No folders, no rich text, no item lists.
 - You hold a small **stack** (~10). One is flagged the **shared prompt** (a "lozenge" in the UI).

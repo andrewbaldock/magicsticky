@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Pin, Undo2, Link2, LogOut } from "lucide-react";
 import { api, ApiError, type StickyMeta, type StickyFull } from "./api.ts";
 import { ConnectorSheet } from "./ConnectorSheet.tsx";
+import { StickyEditor } from "./StickyEditor.tsx";
 
 const MAX_CHARS = 10_000;
 const SAVE_DEBOUNCE_MS = 700;
@@ -172,13 +173,17 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
           </button>
         </div>
 
-        <textarea
-          className="editor"
-          value={text}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="Write your sticky…"
-          spellCheck
-        />
+        {/* key on the sticky id so the editor remounts per sticky with the right initial mode
+            (read if it has content, edit if empty). Render only once the active sticky's text has
+            loaded, so it doesn't mount with an empty value and latch into edit mode. */}
+        {current && current.id === activeId && (
+          <StickyEditor
+            key={current.id}
+            value={text}
+            onChange={onChange}
+            placeholder="Write your sticky…"
+          />
+        )}
 
         <div className={`counter${over ? " over" : ""}`}>
           <span className={`save-state${save === "conflict" || save === "error" ? " conflict" : ""}`}>

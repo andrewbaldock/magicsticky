@@ -1,0 +1,12 @@
+{
+  "//": "Copy this to .mcp.json (gitignored) and replace the token. Claude Code auto-discovers .mcp.json in the project root. Get a token from the web app: sign in -> Connect a Claude -> Generate token (shown once). NEVER commit the real token.",
+  "mcpServers": {
+    "magicsticky": {
+      "type": "http",
+      "url": "https://magicsticky.andrewbaldock.com/mcp",
+      "headers": {
+        "Authorization": "Bearer msk_REPLACE_WITH_YOUR_CONNECTOR_TOKEN"
+      }
+    }
+  }
+}

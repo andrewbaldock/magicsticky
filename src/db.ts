@@ -93,7 +93,6 @@ function sha256(s: string): string {
 // The onboarding blurb appended to sticky 1 on first signup. Plain text (a sticky is not rich
 // text). Deletable by the user; never re-injected (guarded by account.onboarded).
 export const ONBOARDING_BLURB =
-  "—\n" +
   "👋 This is your shared prompt — the note every Claude you talk to can read.\n" +
   "Install the Magic Sticky connector in Claude, then just say \"check my sticky\" to start.\n" +
   "Edit or delete this freely — it's your note.";

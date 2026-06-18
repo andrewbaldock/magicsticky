@@ -162,8 +162,9 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
             {current?.is_shared ? "Shared prompt" : "Make shared"}
           </button>
           <span className="head-spacer" />
-          <button className="icon-btn" onClick={() => setShowToken(true)} aria-label="Connect a Claude" title="Connect a Claude">
-            <Link2 size={20} />
+          <button className="connect-btn" onClick={() => setShowToken(true)} aria-label="Connect a Claude">
+            <Link2 size={16} />
+            <span>Connect</span>
           </button>
           <button className="icon-btn" onClick={onUndo} aria-label="Undo last overwrite" title="Undo">
             <Undo2 size={20} />

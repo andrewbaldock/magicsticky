@@ -22,3 +22,6 @@ playwright-report/
 # scratch: out-of-band Claude Code <-> Cowork conversation, not project artifacts
 CONVO-CC*.txt
 CONVO-CW*.txt
+
+# local MCP connector config — holds the secret bearer token; the .example is committed
+.mcp.json

@@ -160,6 +160,22 @@ body {
 .head-spacer {
   flex: 1;
 }
+/* Labeled "Connect" action — the key thing a new user needs to find, so it's a visible pill, not a
+   cryptic icon. */
+.connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1.5px solid rgba(0, 0, 0, 0.25);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .icon-btn {
   min-width: var(--tap);
   min-height: var(--tap);
@@ -369,9 +385,14 @@ a {
   color: #1a6cc4;
 }
 
-/* Wider screens: cap the writing column so lines aren't absurdly long, keep it centered. */
+/* Wider screens: cap the writing column + center it. Cap the WHOLE app shell (the flex column), not
+   the sticky-pane itself — capping a flex child's width + margin:auto breaks its vertical stretch
+   and floats the pane down the page. Capping .app keeps nav + pane full-height inside the column. */
 @media (min-width: 720px) {
-  .sticky-pane,
+  .app {
+    max-width: 760px;
+    margin: 0 auto;
+  }
   .landing {
     max-width: 760px;
     margin: 0 auto;

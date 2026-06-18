@@ -8,7 +8,7 @@ import { StickyEditor } from "./StickyEditor.tsx";
 import { pastelFor } from "./palette.ts";
 import { OfflinePanel } from "./OfflinePanel.tsx";
 import { nextDelay, classifySaveError } from "./saveRetry.ts";
-import { useSettings, type Theme } from "./useSettings.ts";
+import { useSettings, type Theme } from "./useSettings.tsx";
 import type { CSSProperties } from "react";
 
 // Inline CSS vars for a sticky's per-note color (tab + pane). In dark mode the sticky inverts to a

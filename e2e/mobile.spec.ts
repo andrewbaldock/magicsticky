@@ -37,9 +37,14 @@ test("settings: gear opens panel; theme toggle flips data-theme + sticky ink; fo
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
 
-  // sun/moon toggle → dark; html data-theme flips and the sticky pane goes dark-ink
+  // sun/moon toggle → dark; data-theme flips AND the sticky pane actually recolors (the real bug:
+  // a per-component settings instance meant the toggle didn't re-render the stickies).
+  const paneBgBefore = await page.locator(".sticky-pane").evaluate((el) => getComputedStyle(el).backgroundColor);
   await page.locator(".theme-toggle").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect
+    .poll(async () => page.locator(".sticky-pane").evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe(paneBgBefore); // the sticky fill changed (light pastel → deep pastel)
 
   // font size: Large bumps the scale var
   await page.getByRole("button", { name: "Large" }).click();

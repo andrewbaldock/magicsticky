@@ -1,6 +1,6 @@
 import { Sun, Moon, LogOut } from "lucide-react";
 import { Sheet } from "./Sheet.tsx";
-import { useSettings, type FontSize } from "./useSettings.ts";
+import { useSettings, type FontSize } from "./useSettings.tsx";
 
 const FONT_LABELS: Array<{ key: FontSize; label: string }> = [
   { key: "s", label: "Small" },

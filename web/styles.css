@@ -222,12 +222,14 @@ body {
   min-height: 0;
 }
 
-/* Read view: rendered markdown in the same box; scrolls, tappable to edit. */
+/* Read view: rendered markdown in the same box; scrolls, tappable to edit. A little extra top
+   padding so the first heading isn't jammed against the toolbar above it. */
 .editor.reader {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   cursor: text;
   white-space: normal;
+  padding-top: 24px;
 }
 .editor.reader > :first-child {
   margin-top: 0;

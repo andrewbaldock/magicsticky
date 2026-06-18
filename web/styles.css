@@ -143,11 +143,39 @@ body {
   min-height: 0; /* let the textarea scroll, not the page */
 }
 .sticky-head {
+  position: relative; /* positioning context for the centered brand mark */
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+/* Brand wordmark, dead-centered in the header. Absolutely positioned so the lozenge (left) and the
+   button cluster (right) don't shift it off-center. pointer-events:none so it never eats a tap meant
+   for a control that visually overlaps it on a narrow screen. */
+.head-brand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  color: var(--sticky-ink, var(--ink));
+  white-space: nowrap;
+}
+.head-brand__text {
+  font-family: "Julius Sans One", sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+/* On narrow phones the lozenge + buttons can crowd the center — hide the text, keep the daisy. */
+@media (max-width: 420px) {
+  .head-brand__text {
+    display: none;
+  }
 }
 .lozenge {
   display: inline-flex;

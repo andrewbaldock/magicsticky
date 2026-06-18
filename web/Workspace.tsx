@@ -5,6 +5,7 @@ import { api, ApiError, type StickyMeta, type StickyFull } from "./api.ts";
 import { ConnectorSheet } from "./ConnectorSheet.tsx";
 import { SettingsSheet } from "./SettingsSheet.tsx";
 import { StickyEditor } from "./StickyEditor.tsx";
+import { Daisy } from "./Daisy.tsx";
 import { pastelFor } from "./palette.ts";
 import { OfflinePanel } from "./OfflinePanel.tsx";
 import { nextDelay, classifySaveError } from "./saveRetry.ts";
@@ -271,6 +272,12 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
 
       <main className="sticky-pane" style={activeMeta ? pastelVars(activeMeta.position, theme) : undefined}>
         <div className="sticky-head">
+          {/* Brand mark, absolutely centered so it stays dead-center regardless of the lozenge
+              width on the left or the button cluster on the right. */}
+          <span className="head-brand" aria-hidden="true">
+            <Daisy size={22} />
+            <span className="head-brand__text">Magic Sticky</span>
+          </span>
           <button
             className={`lozenge${current?.is_shared ? " is-shared" : ""}`}
             onClick={onToggleShared}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pin, Undo2, Link2, LogOut } from "lucide-react";
 import { api, ApiError, type StickyMeta, type StickyFull } from "./api.ts";
 import { ConnectorSheet } from "./ConnectorSheet.tsx";
@@ -22,61 +23,86 @@ type SaveState = "idle" | "saving" | "saved" | "conflict" | "error";
 type PendingSave = { next: string; baseVersion: number; id: string };
 
 export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
-  const [metas, setMetas] = useState<StickyMeta[]>([]);
+  const qc = useQueryClient();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [current, setCurrent] = useState<StickyFull | null>(null);
   const [text, setText] = useState("");
   const [save, setSave] = useState<SaveState>("idle");
   const [showToken, setShowToken] = useState(false);
+  const [staleNotice, setStaleNotice] = useState(false); // server changed while we were editing
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryAttempt = useRef(0); // # of consecutive failed save attempts → drives nextDelay()
   const pending = useRef<PendingSave | null>(null); // the latest unsaved edit (for retry/online flush)
+  const dirty = useRef(false); // user has unsaved keystrokes → don't let a poll clobber them
 
-  // Run an async action; on a 401 drop to signed-out, on any other error flag a save error rather
-  // than letting the rejection vanish (every handler routes through this).
+  // 401 anywhere → sign out. Used by mutations/handlers below.
+  const onError = useCallback(
+    (e: unknown) => {
+      if (e instanceof ApiError && e.status === 401) onSignedOut();
+      else setSave("error");
+    },
+    [onSignedOut],
+  );
   const guard = useCallback(
     async (fn: () => Promise<void>) => {
       try {
         await fn();
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) onSignedOut();
-        else setSave("error");
+        onError(e);
       }
     },
-    [onSignedOut],
+    [onError],
   );
 
-  const refreshList = useCallback(async () => {
-    const { stickies } = await api.listStickies();
-    setMetas(stickies);
-    return stickies;
-  }, []);
+  // --- READS via TanStack Query: poll for changes other clients (another Claude/device/tab) make ---
 
-  // Initial load: list, then open the shared one (or the first).
-  useEffect(() => {
-    guard(async () => {
-      const stickies = await refreshList();
-      const open = stickies.find((s) => s.is_shared) ?? stickies[0];
-      if (open) setActiveId(open.id);
-    });
-  }, [guard, refreshList]);
+  // The stack of stickies (metadata + titles). Polls every 15s; refetches on window focus.
+  const listQuery = useQuery({
+    queryKey: ["stickies"],
+    queryFn: () => api.listStickies().then((r) => r.stickies),
+    refetchInterval: 15_000,
+  });
+  const metas: StickyMeta[] = listQuery.data ?? [];
+  const refreshList = useCallback(() => qc.invalidateQueries({ queryKey: ["stickies"] }), [qc]);
 
-  // Load full text whenever the active sticky changes.
+  // On first load (or when the active one vanishes), open the shared sticky (or the first).
   useEffect(() => {
-    if (!activeId) return;
-    let cancelled = false;
-    guard(async () => {
-      const s = await api.getSticky(activeId);
-      if (cancelled) return;
-      setCurrent(s);
-      setText(s.text);
-      setSave("idle");
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeId, guard]);
+    if (metas.length === 0) return;
+    if (activeId && metas.some((m) => m.id === activeId)) return;
+    const open = metas.find((m) => m.is_shared) ?? metas[0];
+    if (open) setActiveId(open.id);
+  }, [metas, activeId]);
+
+  // The active sticky's full text. Polls every 15s so an edit made elsewhere shows up here.
+  const stickyQuery = useQuery({
+    queryKey: ["sticky", activeId],
+    queryFn: () => api.getSticky(activeId as string),
+    enabled: !!activeId,
+    refetchInterval: 15_000,
+  });
+  if (stickyQuery.error) onError(stickyQuery.error); // surface a 401 from polling
+
+  // Adopt the server's version into the editor — but NEVER while the user is mid-edit (dirty), or
+  // we'd clobber their keystrokes. If a newer version arrived while editing, show a quiet notice;
+  // the next save's CAS reconciles. When not dirty, the polled text flows straight in.
+  const serverSticky = stickyQuery.data;
+  useEffect(() => {
+    if (!serverSticky) return;
+    // Nothing new vs what we already hold → don't churn (and don't stomp the save indicator).
+    if (current && current.id === serverSticky.id && current.version === serverSticky.version) return;
+    if (dirty.current) {
+      // mid-edit: never clobber keystrokes; just flag that the server moved ahead.
+      if (current && serverSticky.version > current.version) setStaleNotice(true);
+      return;
+    }
+    // idle / different sticky → adopt the server's version. Does NOT touch `save` (the write path
+    // owns that), so a freshly-saved "Saved" indicator isn't wiped by a poll.
+    setCurrent(serverSticky);
+    setText(serverSticky.text);
+    setStaleNotice(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverSticky?.id, serverSticky?.version, serverSticky?.text]);
 
   // Debounced optimistic-CAS save with offline retry. A failed save (no connection / server blip)
   // does NOT give up — it keeps retrying with backoff until it lands, so edits typed offline sync
@@ -88,7 +114,10 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
         const updated = await api.saveSticky(id, next, baseVersion);
         pending.current = null;
         retryAttempt.current = 0;
+        dirty.current = false; // saved → polling may adopt server state again
+        setStaleNotice(false);
         setCurrent(updated);
+        qc.setQueryData(["sticky", id], updated); // keep the query cache in sync (no clobber-back)
         setSave("saved");
         refreshList(); // nav title (first line) may have changed
       } catch (e) {
@@ -120,7 +149,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
         }, delay);
       }
     },
-    [refreshList, onSignedOut],
+    [refreshList, onSignedOut, qc],
   );
 
   // Debounce keystrokes, then perform (which owns retry). Stash the latest pending edit so a retry
@@ -153,6 +182,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
 
   const onChange = (v: string) => {
     setText(v);
+    dirty.current = true; // hold off polling-adoption until this saves
     if (current) queueSave(v, current.version, current.id);
   };
 
@@ -175,8 +205,11 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
     guard(async () => {
       const restored = await api.undo();
       if (restored.id === activeId) {
+        dirty.current = false; // undo overwrites local text from the server — safe to adopt polls
+        setStaleNotice(false);
         setCurrent(restored);
         setText(restored.text);
+        qc.setQueryData(["sticky", restored.id], restored);
         setSave("idle");
       }
       await refreshList();
@@ -248,11 +281,18 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
         )}
 
         <div className={`counter${over ? " over" : ""}`}>
-          <span className={`save-state${save === "conflict" || save === "error" ? " conflict" : ""}`}>
-            {save === "saving" && "Saving…"}
-            {save === "saved" && "Saved"}
-            {save === "conflict" && "Merged a newer version — re-saving…"}
-            {save === "error" && "Offline — your edits are queued, retrying…"}
+          <span className={`save-state${save === "conflict" || save === "error" || staleNotice ? " conflict" : ""}`}>
+            {staleNotice
+              ? "Updated elsewhere — your changes will merge on save"
+              : save === "saving"
+                ? "Saving…"
+                : save === "saved"
+                  ? "Saved"
+                  : save === "conflict"
+                    ? "Merged a newer version — re-saving…"
+                    : save === "error"
+                      ? "Offline — your edits are queued, retrying…"
+                      : ""}
           </span>
           {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()}
         </div>

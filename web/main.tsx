@@ -1,11 +1,26 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App.tsx";
 import "./styles.css";
 
+// Server reads (the sticky list + the active sticky) go through TanStack Query so they poll for
+// changes other clients make. Writes stay on the bespoke save/offline-retry path (see Workspace).
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: true, // catch "edited on my phone, back to laptop"
+      staleTime: 5_000,
+      retry: 1,
+    },
+  },
+});
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </StrictMode>,
 );
 

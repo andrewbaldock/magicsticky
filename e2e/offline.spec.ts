@@ -45,6 +45,28 @@ test("offline → capture a text note → back online → it syncs (appends belo
   expect(found).toBe(true);
 });
 
+test("live update: an edit made elsewhere shows up via polling (when not mid-edit)", async ({
+  page,
+}) => {
+  await signIn(page, "original text");
+  await page.goto("/");
+  const reader = page.locator(".editor.reader");
+  await reader.waitFor();
+  await expect(reader).toContainText("original text");
+
+  // simulate ANOTHER client editing the shared sticky via the API
+  const { stickies } = await (await page.request.get("/api/stickies")).json();
+  const shared = (stickies as Array<{ id: string; is_shared: boolean }>).find((s) => s.is_shared)!;
+  const full = await (await page.request.get(`/api/stickies/${shared.id}`)).json();
+  const put = await page.request.put(`/api/stickies/${shared.id}`, {
+    data: { text: "changed by another device", version: full.version },
+  });
+  expect(put.status()).toBe(200);
+
+  // the polling query (refetchInterval) should pick it up and the read view updates — no reload
+  await expect(reader).toContainText("changed by another device", { timeout: 20_000 });
+});
+
 test("offline bar is hidden while online with nothing pending", async ({ page }) => {
   await signIn(page);
   await page.goto("/");

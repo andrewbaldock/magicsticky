@@ -22,9 +22,11 @@ marked.use({
     listitem(item: Tokens.ListItem) {
       const body = this.parser.parse(item.tokens);
       if (!item.task) return `<li>${body}</li>`;
-      // marked injects a raw <input type=checkbox> at the start of a task item's body — strip it
-      // and replace with our own non-interactive glyph (▢ / ✓).
-      const stripped = body.replace(/^\s*<input[^>]*>\s*/i, "");
+      // marked injects a raw <input type=checkbox> at the START of a task item's body — strip it and
+      // replace with our own non-interactive glyph (▢ / ✓). In a LOOSE list (items separated by blank
+      // lines, e.g. a numbered list), the body is wrapped in <p>, so the <input> sits right AFTER the
+      // opening <p> — match both placements, else the raw checkbox leaks through (the grey-box bug).
+      const stripped = body.replace(/^(\s*<p>)?\s*<input[^>]*>\s*/i, "$1");
       const cls = item.checked ? "md-task md-task--done" : "md-task";
       const glyph = item.checked ? "✓" : "▢";
       return `<li class="${cls}"><span class="md-check" aria-hidden="true">${glyph}</span>${stripped}</li>`;

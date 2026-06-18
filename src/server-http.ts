@@ -54,6 +54,16 @@ const token = process.env.MAGICSTICKY_TOKEN;
 const userId = process.env.MAGICSTICKY_USER ?? "andrew";
 // Local default 3001 (3000 is Orion's API; prod/Fly sets PORT=8080 via fly.toml).
 const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+// Guard the one collision that actually bites: 3000 is ORION's API. A stray `PORT=3000` in a local
+// .env silently lands magicsticky on top of Orion → EADDRINUSE → "1/2 up" in SwiftBar with a cryptic
+// log. Refuse it early with the fix, in dev only (prod/Fly legitimately sets its own PORT, e.g. 8080).
+if (process.env.NODE_ENV !== "production" && port === 3000) {
+  console.error(
+    "Refusing to start on port 3000 — that's Orion's API. Magic Sticky's dev port is 3001.\n" +
+      "Fix: remove the PORT=3000 line from .env (the default is already 3001), or set PORT=3001.",
+  );
+  process.exit(1);
+}
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 // The canonical public origin. Enables the OAuth Authorization Server (desktop/phone connector) when
 // set together with a session signer + Google verifier. In dev it's fine to leave unset (Claude Code

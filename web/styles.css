@@ -41,6 +41,10 @@ body,
 #root {
   margin: 0;
   height: 100%;
+  /* The app shell owns all scrolling (the sticky body scrolls internally). Lock the document so it
+     can never gain a sliver of its own scroll — otherwise the viewport-unit mismatch below would let
+     the whole frame (nav + header) slide up off-screen with no way back. */
+  overflow: hidden;
 }
 body {
   background: var(--bg);
@@ -49,12 +53,15 @@ body {
   -webkit-text-size-adjust: 100%; /* iOS: don't auto-zoom text */
 }
 
-/* App shell: full visual-viewport height; svh avoids the iOS 100vh overshoot. */
+/* App shell: fill the REAL content viewport. height:100% resolves against html/body/#root (all
+   100%), which equals documentElement.clientHeight — unlike 100dvh, which resolves to the larger
+   *layout* viewport and overflowed by ~15px on desktop (and a whole toolbar's worth on mobile),
+   letting the document scroll the fixed nav + header off the top. (Confirmed via Chrome DevTools:
+   100dvh→749px vs real 734px; 100% drops the document overflow to 0.) */
 .app {
   display: flex;
   flex-direction: column;
-  height: 100svh;
-  height: 100dvh;
+  height: 100%;
   padding-left: var(--safe-l);
   padding-right: var(--safe-r);
 }
@@ -225,20 +232,25 @@ body {
 .editor.reader > :first-child {
   margin-top: 0;
 }
+/* Headings in a sticky should structure, not shout — modest scale + softened weight so a note reads
+   like a note, not a landing page. */
 .editor.reader h1,
 .editor.reader h2,
 .editor.reader h3 {
-  line-height: 1.25;
+  line-height: 1.3;
   margin: 0.8em 0 0.3em;
 }
 .editor.reader h1 {
-  font-size: 1.5em;
+  font-size: 1.3em;
+  font-weight: 650;
 }
 .editor.reader h2 {
-  font-size: 1.25em;
+  font-size: 1.12em;
+  font-weight: 600;
 }
 .editor.reader h3 {
-  font-size: 1.1em;
+  font-size: 1.02em;
+  font-weight: 600;
 }
 .editor.reader p,
 .editor.reader ul,
@@ -250,6 +262,12 @@ body {
 .editor.reader ul,
 .editor.reader ol {
   padding-left: 1.4em;
+}
+/* A sticky is never a form. Hard backstop: hide any raw <input> in the read view (e.g. the
+   <input type=checkbox> marked injects for GFM task items, which leaks through in loose/ordered
+   lists). The ▢/✓ glyph below is the real, non-interactive indicator. */
+.editor.reader input {
+  display: none;
 }
 /* GFM task items: render as a clear ▢ / ✓ glyph (not a form checkbox). Non-interactive — the text
    is the source of truth; toggle by editing. */

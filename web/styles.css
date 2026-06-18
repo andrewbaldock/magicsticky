@@ -383,6 +383,84 @@ body {
   font-size: 13px;
 }
 
+/* ---- offline catch-up panel (shown when offline / while notes are still syncing) ---- */
+.offline-bar {
+  background: #3a3a40;
+  color: #f4f1e8;
+  padding: calc(var(--safe-t) + 10px) max(12px, var(--safe-l)) 12px max(12px, var(--safe-r));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.offline-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.offline-choice {
+  display: flex;
+  gap: 10px;
+}
+.big-choice {
+  flex: 1;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f1e8;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.big-choice small {
+  font-weight: 400;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.offline-capture {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.offline-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: #f4f1e8;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.offline-input {
+  min-height: 96px;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  font-size: 16px; /* >=16 so iOS doesn't zoom */
+  resize: vertical;
+  background: #fffdf6;
+  color: var(--ink);
+}
+.offline-bar .muted {
+  color: rgba(244, 241, 232, 0.7);
+}
+.offline-queued {
+  font-size: 13px;
+}
+
 /* link styling (used by the connector sheet's docs link, and a future read view) */
 a {
   color: #1a6cc4;

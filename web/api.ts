@@ -71,4 +71,13 @@ export const api = {
   connectorToken: () => req<{ token: string }>("/api/connector-token", { method: "POST" }),
 
   logout: () => req<{ ok: boolean }>("/api/logout", { method: "POST" }),
+
+  // Append an offline-captured note (kind "text" → lowest non-shared sticky; "claude" → shared),
+  // below a timestamped divider. Append-only / conflict-free.
+  catchUp: (kind: "text" | "claude", note: string, stamp: string) =>
+    req<{ id: string }>("/api/catch-up", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind, note, stamp }),
+    }),
 };

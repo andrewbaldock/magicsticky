@@ -284,6 +284,54 @@ export class Store {
     return r ? this.rowToSticky(r) : null;
   }
 
+  // The lowest-position sticky that is NOT the shared one (the target for offline TEXT notes).
+  lowestNonShared(userId: string): Sticky | null {
+    const r = this.db
+      .query<Row, [string]>(
+        "SELECT * FROM sticky WHERE user_id = ? AND is_shared = 0 ORDER BY position LIMIT 1",
+      )
+      .get(userId);
+    return r ? this.rowToSticky(r) : null;
+  }
+
+  // Append `addition` to a sticky's text, no version check. Append-only is CONFLICT-FREE by
+  // construction — it never overwrites, so a concurrent edit elsewhere can't be clobbered (this is
+  // why offline catch-up notes append instead of overwrite). Caps at MAX_CHARS (throws if it would
+  // overflow). Used by appendCatchUp.
+  append(userId: string, id: string, addition: string): Sticky {
+    const tx = this.db.transaction(() => {
+      const cur = this.get(userId, id);
+      if (!cur) throw new NotFoundError(`sticky ${id}`);
+      const joined = cur.text ? `${cur.text}\n${addition}` : addition;
+      if (joined.length > MAX_CHARS) throw new TooLongError(joined.length);
+      const { stored, keyId } = this.encOut(joined, userId);
+      const prev = this.encOut(cur.text, userId);
+      this.db.run(
+        `UPDATE sticky
+         SET prev_text = ?, text = ?, char_count = ?, key_id = ?, version = version + 1, updated_at = ?
+         WHERE user_id = ? AND id = ?`,
+        [prev.stored, stored, joined.length, keyId, this.now(), userId, id],
+      );
+    });
+    tx();
+    return this.get(userId, id)!;
+  }
+
+  // Land an offline catch-up note. kind "claude" → the shared sticky; "text" → the lowest non-shared
+  // sticky, auto-CREATING one if none exists. Appends below a timestamped divider (conflict-free).
+  appendCatchUp(userId: string, kind: "text" | "claude", note: string, stamp: string): Sticky {
+    const divider = `------ pwa catch-up ${stamp} -----`;
+    const block = `${divider}\n${note}`;
+    if (kind === "claude") {
+      const shared = this.getShared(userId);
+      if (!shared) throw new NotFoundError("shared sticky");
+      return this.append(userId, shared.id, block);
+    }
+    let target = this.lowestNonShared(userId);
+    if (!target) target = this.create(userId, ""); // no non-shared sticky → make one to hold it
+    return this.append(userId, target.id, block);
+  }
+
   // The ONE compare-and-swap every write path uses. Rejects on stale version or over-cap; stashes
   // the overwritten text into prev_text (1-deep undo); bumps version. Returns the updated sticky.
   writeShared(userId: string, id: string, text: string, expectedVersion: number): Sticky {

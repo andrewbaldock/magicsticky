@@ -217,6 +217,30 @@ export function createApp({
     return c.json({ id: s.id, text: s.text, version: s.version });
   });
 
+  // Offline catch-up: append a note captured while offline. kind "text" → lowest non-shared sticky
+  // (auto-created if none); "claude" → the shared sticky. Append-only, below a timestamped divider —
+  // conflict-free, so it never clobbers edits made elsewhere while you were offline.
+  app.post("/api/catch-up", async (c) => {
+    let body: { kind?: string; note?: string; stamp?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "expected JSON body" }, 400);
+    }
+    if ((body.kind !== "text" && body.kind !== "claude") || typeof body.note !== "string" || !body.note) {
+      return c.json({ error: 'kind ("text"|"claude") and a non-empty note are required' }, 400);
+    }
+    const stamp = typeof body.stamp === "string" && body.stamp ? body.stamp : new Date().toISOString();
+    try {
+      const s = store.appendCatchUp(c.get("userId"), body.kind, body.note, stamp);
+      return c.json({ id: s.id, char_count: s.char_count, is_shared: s.is_shared });
+    } catch (e) {
+      if (e instanceof TooLongError) return c.json({ error: "too_long", limit: e.length }, 413);
+      if (e instanceof NotFoundError) return c.json({ error: "not found" }, 404);
+      throw e;
+    }
+  });
+
   // "Connect a Claude": generate (or rotate) this user's connector token. The RAW token is returned
   // ONCE — only its hash is stored. The UI reveals it once for copy, then it's unrecoverable.
   app.post("/api/connector-token", (c) => {
@@ -259,6 +283,7 @@ export function createApp({
     // correct content-types so the PWA installs and icons load.
     const rootFiles: Record<string, string> = {
       "/manifest.webmanifest": "application/manifest+json",
+      "/sw.js": "text/javascript",
       "/favicon.svg": "image/svg+xml",
       "/icon.svg": "image/svg+xml",
       "/icon-192.png": "image/png",

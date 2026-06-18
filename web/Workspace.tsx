@@ -4,6 +4,7 @@ import { api, ApiError, type StickyMeta, type StickyFull } from "./api.ts";
 import { ConnectorSheet } from "./ConnectorSheet.tsx";
 import { StickyEditor } from "./StickyEditor.tsx";
 import { pastelFor } from "./palette.ts";
+import { OfflinePanel } from "./OfflinePanel.tsx";
 import type { CSSProperties } from "react";
 
 // Inline CSS vars for a sticky's pastel color (drives both its tab and, when active, the pane).
@@ -189,6 +190,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
 
   return (
     <div className="app">
+      <OfflinePanel />
       <nav className="nav" aria-label="Your stickies">
         {metas.map((m) => (
           <button

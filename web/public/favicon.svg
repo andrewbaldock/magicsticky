@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Magic Sticky daisy: white petals on the sticky-yellow center. -->
+  <g transform="translate(32 32)">
+    <!-- 8 petals, rotated around the center -->
+    <g fill="#ffffff" stroke="#e6c24a" stroke-width="1">
+      <g><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(45)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(90)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(135)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(180)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(225)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(270)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+      <g transform="rotate(315)"><ellipse cx="0" cy="-19" rx="7.5" ry="14"/></g>
+    </g>
+    <!-- center -->
+    <circle cx="0" cy="0" r="10" fill="#f7d774" stroke="#e6c24a" stroke-width="1.5"/>
+  </g>
+</svg>

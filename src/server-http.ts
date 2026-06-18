@@ -5,6 +5,7 @@
 //   MAGICSTICKY_DB     path to the SQLite file (default ./magicsticky.db; on Fly = volume path)
 //   MAGICSTICKY_TOKEN  the static connector bearer token (single-user MVP)
 //   MAGICSTICKY_USER   the userId that token maps to (default "andrew")
+//   MAGICSTICKY_PUBLIC_URL  canonical public origin (enables the OAuth AS for desktop/phone Claude)
 //   PORT               listen port (default 3001 locally; Fly sets 8080)
 
 import { createHash, timingSafeEqual } from "node:crypto";
@@ -54,6 +55,10 @@ const userId = process.env.MAGICSTICKY_USER ?? "andrew";
 // Local default 3001 (3000 is Orion's API; prod/Fly sets PORT=8080 via fly.toml).
 const port = process.env.PORT ? Number(process.env.PORT) : 3001;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
+// The canonical public origin. Enables the OAuth Authorization Server (desktop/phone connector) when
+// set together with a session signer + Google verifier. In dev it's fine to leave unset (Claude Code
+// connects via the static bearer); set it to the real https origin in prod.
+const publicUrl = process.env.MAGICSTICKY_PUBLIC_URL;
 // Who may sign in (comma-separated). Single-user/demo allowlist — without it, sign-in is deny-all.
 const allowedSubs = (process.env.MAGICSTICKY_ALLOWED_SUBS ?? "")
   .split(",")
@@ -102,7 +107,16 @@ const app = createApp({
   // Serve the built UI from this origin when MAGICSTICKY_WEB_DIST points at web/dist (prod). In dev
   // we run Vite separately on :5180; leave it unset.
   webDist: process.env.MAGICSTICKY_WEB_DIST,
+  // OAuth AS for the desktop/phone connector (reuses the session + Google sign-in). Needs all three.
+  publicUrl,
+  googleClientId,
 });
+
+if (publicUrl && (!sessionSecret || !googleClientId)) {
+  console.warn(
+    "MAGICSTICKY_PUBLIC_URL set but OAuth AS is disabled — it also needs MAGICSTICKY_SESSION_SECRET + GOOGLE_CLIENT_ID.",
+  );
+}
 
 console.log(
   `magicsticky HTTP on :${port} (db: ${dbPath}; google sign-in: ${googleClientId ? "on" : "off"})`,

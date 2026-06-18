@@ -31,8 +31,21 @@ backed by one SQLite file on a volume.
   cookie**; `/api/*` is gated on it. An allowlist (`MAGICSTICKY_ALLOWED_*`) controls *who* may create
   an account (deny-all by default).
 - **Claude (any client)** → the **MCP connector** at `/mcp`, authenticated by a per-account
-  **bearer token** (`msk_…`, sha256-hashed at rest). The bootstrap env token also works (single
-  user). The two paths share nothing but the store.
+  **bearer token** (`msk_…`, sha256-hashed at rest). A Claude obtains that token one of two ways,
+  depending on what the client supports — both end at the *same* `/mcp` bearer check, so the store
+  sees one auth path:
+  - **Static header** (Claude Code): paste the `msk_…` token into `.mcp.json`'s `Authorization`
+    header. The bootstrap env token also works (single user).
+  - **OAuth** (desktop / phone / Cowork — no header field in their dialog): Magic Sticky is its own
+    minimal **OAuth 2.1 Authorization Server**. A 401 from `/mcp` carries a `WWW-Authenticate`
+    `resource_metadata` pointer (RFC 9728); the client discovers `/.well-known/oauth-*`, registers
+    (RFC 7591 DCR), runs the authorization-code flow with **PKCE S256** + an RFC 8707 `resource`,
+    and the token endpoint returns a per-client connector token as the `access_token`. The human leg
+    reuses the Google session; **every Claude that connects gets its own token, all resolving to the
+    one account** — that's the "all Claudes share one prompt" guarantee. (`src/oauth.ts` + the
+    `/oauth/*` routes in `src/app.ts`; tokens in the `connector_token` table.)
+
+  The human and machine paths share nothing but the store.
 
 ## Data model (one table)
 `sticky`: `id, user_id, text, prev_text, char_count, key_id, is_shared, position, version,

@@ -73,6 +73,24 @@ export interface Account {
   updated_at: string;
 }
 
+// A registered OAuth client (decoded redirect_uris).
+export interface OAuthClient {
+  client_id: string;
+  client_secret_hash: string | null;
+  redirect_uris: string[];
+  name: string | null;
+  created_at: string;
+}
+
+// A redeemed OAuth authorization code's bound context (returned by takeOAuthCode).
+export interface OAuthCode {
+  client_id: string;
+  user_id: string;
+  code_challenge: string;
+  redirect_uri: string;
+  resource: string | null;
+}
+
 interface AccountRow {
   user_id: string;
   google_sub: string;
@@ -197,6 +215,44 @@ export class Store {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS account_connector_token
         ON account(connector_token_hash) WHERE connector_token_hash IS NOT NULL;
+
+      -- Per-CLIENT connector tokens (many per account). The single account.connector_token_hash
+      -- above is the human "Connect a Claude" button (one revealed-once token); THIS table is for
+      -- the OAuth flow, where EACH Claude client that completes sign-in gets its OWN token — all
+      -- resolving to the same account, so "all Claudes share one prompt" holds without one client's
+      -- reconnect logging out the others. We store only the sha256 hash; label is for the user
+      -- ("Cowork desktop"). Revoke = delete the row.
+      CREATE TABLE IF NOT EXISTS connector_token (
+        token_hash TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL,
+        label      TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS connector_token_user ON connector_token(user_id);
+
+      -- Registered OAuth clients (RFC 7591 DCR + pre-registered). Single-user app, so registration
+      -- is permissive, but redirect_uris are recorded and exact-matched at authorize/token time.
+      -- client_secret_hash is NULL for public clients (PKCE-only, which is what Claude uses).
+      CREATE TABLE IF NOT EXISTS oauth_client (
+        client_id          TEXT PRIMARY KEY,
+        client_secret_hash TEXT,
+        redirect_uris      TEXT NOT NULL,   -- JSON array
+        name               TEXT,
+        created_at         TEXT NOT NULL
+      );
+
+      -- One-shot OAuth authorization codes (deleted on redeem; TTL-expiring). Bind the code to the
+      -- client, the user it authorized, the PKCE challenge, the redirect_uri, and the RFC 8707
+      -- resource — all re-checked at the token endpoint. We store the sha256 of the code, never raw.
+      CREATE TABLE IF NOT EXISTS oauth_code (
+        code_hash      TEXT PRIMARY KEY,
+        client_id      TEXT NOT NULL,
+        user_id        TEXT NOT NULL,
+        code_challenge TEXT NOT NULL,
+        redirect_uri   TEXT NOT NULL,
+        resource       TEXT,
+        expires_at     INTEGER NOT NULL   -- epoch ms
+      );
     `);
   }
 
@@ -413,6 +469,7 @@ export class Store {
   deleteAccount(userId: string): void {
     const tx = this.db.transaction(() => {
       this.db.run("DELETE FROM sticky WHERE user_id = ?", [userId]);
+      this.db.run("DELETE FROM connector_token WHERE user_id = ?", [userId]);
       this.db.run("DELETE FROM account WHERE user_id = ?", [userId]);
     });
     tx();
@@ -451,16 +508,113 @@ export class Store {
   }
 
   // Resolve a raw connector token to its owning userId via the stored hash (indexed lookup = the
-  // equality check). Returns null if no account has that token. The env bootstrap token is handled
-  // separately in app.ts (resolveToken), so Andrew's existing connector keeps working.
+  // equality check). Checks BOTH the human "Connect a Claude" token (account.connector_token_hash)
+  // AND the per-client OAuth tokens (connector_token table) — all of an account's tokens resolve to
+  // the same userId, which is what lets every Claude share the one prompt. Returns null if unknown.
+  // The env bootstrap token is handled separately in app.ts (resolveToken).
   resolveConnectorToken(rawToken: string): string | null {
     if (!rawToken) return null;
-    const r = this.db
+    const hash = sha256(rawToken);
+    const acct = this.db
       .query<{ user_id: string }, [string]>(
         "SELECT user_id FROM account WHERE connector_token_hash = ?",
       )
-      .get(sha256(rawToken));
-    return r ? r.user_id : null;
+      .get(hash);
+    if (acct) return acct.user_id;
+    const tok = this.db
+      .query<{ user_id: string }, [string]>(
+        "SELECT user_id FROM connector_token WHERE token_hash = ?",
+      )
+      .get(hash);
+    return tok ? tok.user_id : null;
+  }
+
+  // Mint a per-client connector token (the OAuth flow's access_token). Returns the RAW token ONCE;
+  // only its hash is stored. Many per account — each Claude client keeps its own. `label` is a human
+  // hint (e.g. the client name). Throws if the account doesn't exist (a token must own an account).
+  issueConnectorToken(userId: string, label?: string): string {
+    if (!this.hasAccount(userId)) throw new NotFoundError(`account ${userId}`);
+    const raw = `msk_${randomBytes(32).toString("base64url")}`;
+    this.db.run(
+      "INSERT INTO connector_token (token_hash, user_id, label, created_at) VALUES (?, ?, ?, ?)",
+      [sha256(raw), userId, label ?? null, this.now()],
+    );
+    return raw;
+  }
+
+  // --- OAuth Authorization Server storage (clients + one-shot codes; see /oauth routes in app.ts) ---
+
+  // Register an OAuth client (DCR or pre-registered). secret is optional (public PKCE clients have
+  // none). Stores only the secret's hash. redirect_uris are recorded for exact-match at auth time.
+  registerOAuthClient(opts: {
+    clientId: string;
+    redirectUris: string[];
+    name?: string;
+    secret?: string;
+  }): void {
+    this.db.run(
+      "INSERT INTO oauth_client (client_id, client_secret_hash, redirect_uris, name, created_at) VALUES (?, ?, ?, ?, ?)",
+      [
+        opts.clientId,
+        opts.secret ? sha256(opts.secret) : null,
+        JSON.stringify(opts.redirectUris),
+        opts.name ?? null,
+        this.now(),
+      ],
+    );
+  }
+
+  getOAuthClient(clientId: string): OAuthClient | null {
+    const r = this.db
+      .query<
+        { client_id: string; client_secret_hash: string | null; redirect_uris: string; name: string | null; created_at: string },
+        [string]
+      >("SELECT * FROM oauth_client WHERE client_id = ?")
+      .get(clientId);
+    if (!r) return null;
+    return {
+      client_id: r.client_id,
+      client_secret_hash: r.client_secret_hash,
+      redirect_uris: JSON.parse(r.redirect_uris) as string[],
+      name: r.name,
+      created_at: r.created_at,
+    };
+  }
+
+  // Store a one-shot authorization code. `code` is the raw value (we hash it); expiresAtMs is the
+  // absolute epoch-ms expiry.
+  putOAuthCode(code: string, ctx: OAuthCode & { expiresAtMs: number }): void {
+    this.db.run(
+      `INSERT INTO oauth_code (code_hash, client_id, user_id, code_challenge, redirect_uri, resource, expires_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [sha256(code), ctx.client_id, ctx.user_id, ctx.code_challenge, ctx.redirect_uri, ctx.resource, ctx.expiresAtMs],
+    );
+  }
+
+  // Redeem a code: SELECT + DELETE atomically (one-shot — a replay finds nothing), and drop it if
+  // expired. Returns the bound context, or null if unknown/expired. `nowMs` is injected so the token
+  // endpoint controls the clock (and tests can too).
+  takeOAuthCode(code: string, nowMs: number): OAuthCode | null {
+    const hash = sha256(code);
+    const tx = this.db.transaction((): OAuthCode | null => {
+      const r = this.db
+        .query<
+          { client_id: string; user_id: string; code_challenge: string; redirect_uri: string; resource: string | null; expires_at: number },
+          [string]
+        >("SELECT * FROM oauth_code WHERE code_hash = ?")
+        .get(hash);
+      if (!r) return null;
+      this.db.run("DELETE FROM oauth_code WHERE code_hash = ?", [hash]); // one-shot, even if expired
+      if (r.expires_at < nowMs) return null;
+      return {
+        client_id: r.client_id,
+        user_id: r.user_id,
+        code_challenge: r.code_challenge,
+        redirect_uri: r.redirect_uri,
+        resource: r.resource,
+      };
+    });
+    return tx();
   }
 
   // Sign-in entry point. Returns the existing account for a returning user (NO re-seeding — the

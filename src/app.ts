@@ -12,6 +12,16 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { Store, VersionConflictError, TooLongError, NotFoundError } from "./db.ts";
 import { buildMcpServer } from "./mcp.ts";
 import type { SessionSigner } from "./session.ts";
+import {
+  AUTH_CODE_TTL_MS,
+  asMetadata,
+  checkAuthorizeRequest,
+  clientSecretMatches,
+  protectedResourceMetadata,
+  randomClientId,
+  randomCode,
+  verifyPkceS256,
+} from "./oauth.ts";
 
 const SESSION_COOKIE = "ms_session";
 
@@ -42,6 +52,15 @@ export interface AppOptions {
   // Absolute path to the built web app (web/dist) to serve from this origin in prod. Omit in dev
   // (Vite serves the UI) and in tests.
   webDist?: string;
+  // The canonical public origin (e.g. https://magicsticky.andrewbaldock.com). When set (together
+  // with a session signer), Magic Sticky acts as its own OAuth 2.1 Authorization Server so the
+  // desktop/phone connector dialog can sign in. It's the OAuth issuer + the RFC 8707 resource id.
+  // Omit (dev/tests without OAuth) → the /.well-known + /oauth routes 501.
+  publicUrl?: string;
+  // The Google client id used to render the GIS sign-in button on the /oauth/authorize consent page
+  // when the human isn't signed in yet. Without it, the authorize page can only show "already signed
+  // in" consent (tests inject a session directly).
+  googleClientId?: string;
 }
 
 type Variables = { userId: string };
@@ -54,8 +73,16 @@ export function createApp({
   session,
   secureCookie = true,
   webDist,
+  publicUrl,
+  googleClientId,
 }: AppOptions): Hono<{ Variables: Variables }> {
   const app = new Hono<{ Variables: Variables }>();
+
+  // The OAuth AS is enabled only with a public URL + a session signer (it reuses the human session
+  // to know WHO is authorizing). Helpers close over these so the routes stay terse.
+  const oauthEnabled = !!publicUrl && !!session;
+  const sessionUserId = (c: Parameters<typeof getCookie>[0]) =>
+    session ? session.verify(getCookie(c, SESSION_COOKIE) ?? "") : null;
 
   // CORS for MCP clients (the connector handshake needs these headers exposed).
   app.use(
@@ -76,6 +103,15 @@ export function createApp({
     const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
     const userId = token ? (resolveToken(token) ?? store.resolveConnectorToken(token)) : null;
     if (!userId) {
+      // RFC 9728 §5.1: point unauthenticated MCP clients at our protected-resource metadata so the
+      // desktop/phone connector can discover the OAuth flow (it has no static-header field). The
+      // header is what turns a bare 401 into "go do OAuth here."
+      if (oauthEnabled) {
+        c.header(
+          "WWW-Authenticate",
+          `Bearer resource_metadata="${publicUrl!.replace(/\/+$/, "")}/.well-known/oauth-protected-resource"`,
+        );
+      }
       return c.json({ error: "unauthorized: provide a valid Bearer token" }, 401);
     }
     c.set("userId", userId);
@@ -97,6 +133,151 @@ export function createApp({
   });
 
   app.get("/healthz", (c) => c.json({ status: "ok" }));
+
+  // ---- OAuth 2.1 Authorization Server (machine path for desktop/phone Claude) ---------------------
+  // The connector dialog only speaks OAuth, so we expose a tiny AS. The access_token it ultimately
+  // hands back is a per-client `msk_…` connector token (store.issueConnectorToken) that the /mcp
+  // middleware above already resolves — every Claude client ends up with its own token pointing at
+  // the same account, which is the literal "all Claudes share one prompt" guarantee.
+
+  // RFC 9728 — protected-resource metadata. Names us as our own authorization server.
+  app.get("/.well-known/oauth-protected-resource", (c) => {
+    if (!oauthEnabled) return c.json({ error: "oauth not configured" }, 501);
+    return c.json(protectedResourceMetadata(publicUrl!));
+  });
+
+  // RFC 8414 — authorization-server metadata (endpoints + mandatory S256 PKCE advertisement).
+  app.get("/.well-known/oauth-authorization-server", (c) => {
+    if (!oauthEnabled) return c.json({ error: "oauth not configured" }, 501);
+    return c.json(asMetadata(publicUrl!));
+  });
+
+  // RFC 7591 — Dynamic Client Registration. Zero-config path the connector prefers: the client POSTs
+  // its redirect_uris (+ name), we mint a public client_id. Single-user app, so registration is
+  // permissive; the redirect_uris are recorded and exact-matched at authorize/token time.
+  app.post("/oauth/register", async (c) => {
+    if (!oauthEnabled) return c.json({ error: "oauth not configured" }, 501);
+    let body: { redirect_uris?: unknown; client_name?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid_client_metadata", error_description: "expected JSON body" }, 400);
+    }
+    const uris = Array.isArray(body.redirect_uris)
+      ? body.redirect_uris.filter((u): u is string => typeof u === "string" && u.length > 0)
+      : [];
+    if (uris.length === 0) {
+      return c.json({ error: "invalid_redirect_uri", error_description: "redirect_uris required" }, 400);
+    }
+    const clientId = randomClientId();
+    store.registerOAuthClient({
+      clientId,
+      redirectUris: uris,
+      name: typeof body.client_name === "string" ? body.client_name : undefined,
+    });
+    // Public client (PKCE, no secret) — token_endpoint_auth_method "none".
+    return c.json(
+      {
+        client_id: clientId,
+        redirect_uris: uris,
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code"],
+        response_types: ["code"],
+        client_name: typeof body.client_name === "string" ? body.client_name : undefined,
+      },
+      201,
+    );
+  });
+
+  // Authorization endpoint. Validates the request, then needs to know WHO is authorizing — it reuses
+  // the human web session. If signed in → render a consent page that POSTs back an approval. If not
+  // → render the Google sign-in button; after sign-in the page reloads here with a session cookie.
+  app.get("/oauth/authorize", (c) => {
+    if (!oauthEnabled) return c.text("oauth not configured", 501);
+    const params = new URL(c.req.url).searchParams;
+    const clientId = params.get("client_id") ?? "";
+    const client = store.getOAuthClient(clientId);
+    const check = checkAuthorizeRequest(params, client, publicUrl!);
+    if (!check.ok) return c.html(errorPage(check.error), check.status as 400);
+
+    const userId = sessionUserId(c);
+    if (!userId || !store.hasAccount(userId)) {
+      // Not signed in → show the Google button. It signs in (sets the cookie via /auth/google) then
+      // reloads this same authorize URL, at which point the session branch below takes over.
+      return c.html(signInPage(c.req.url, googleClientId));
+    }
+    // Signed in → consent. Approving POSTs the original query back to /oauth/authorize/approve.
+    return c.html(consentPage(c.req.url, client!.name ?? "this Claude", params.toString()));
+  });
+
+  // Approve: the human clicked "Connect". Re-validate, mint a one-shot code bound to (client, user,
+  // PKCE challenge, redirect_uri, resource), and 302 back to the client's redirect_uri with ?code.
+  app.post("/oauth/authorize/approve", async (c) => {
+    if (!oauthEnabled) return c.text("oauth not configured", 501);
+    const form = await c.req.formData();
+    const raw = String(form.get("params") ?? "");
+    const params = new URLSearchParams(raw);
+    const client = store.getOAuthClient(params.get("client_id") ?? "");
+    const check = checkAuthorizeRequest(params, client, publicUrl!);
+    if (!check.ok) return c.html(errorPage(check.error), check.status as 400);
+
+    const userId = sessionUserId(c);
+    if (!userId || !store.hasAccount(userId)) return c.html(errorPage("session expired — reopen the connector"), 401);
+
+    const code = randomCode();
+    store.putOAuthCode(code, {
+      client_id: check.clientId,
+      user_id: userId,
+      code_challenge: check.codeChallenge,
+      redirect_uri: check.redirectUri,
+      resource: check.resource,
+      expiresAtMs: Date.now() + AUTH_CODE_TTL_MS,
+    });
+    const url = new URL(check.redirectUri);
+    url.searchParams.set("code", code);
+    if (check.state) url.searchParams.set("state", check.state);
+    return c.redirect(url.toString(), 302);
+  });
+
+  // Token endpoint. authorization_code grant only: redeem the one-shot code, verify PKCE + the
+  // redirect_uri + the client (and secret, if confidential), then issue a per-client connector token
+  // as the access_token. That token authenticates /mcp directly — no JWT, no refresh.
+  app.post("/oauth/token", async (c) => {
+    if (!oauthEnabled) return c.json({ error: "invalid_request", error_description: "oauth not configured" }, 501);
+    const form = await c.req.formData();
+    const get = (k: string) => {
+      const v = form.get(k);
+      return typeof v === "string" ? v : undefined;
+    };
+    if (get("grant_type") !== "authorization_code") {
+      return c.json({ error: "unsupported_grant_type" }, 400);
+    }
+    const code = get("code");
+    const codeVerifier = get("code_verifier");
+    const clientId = get("client_id");
+    const redirectUri = get("redirect_uri");
+    if (!code || !codeVerifier || !clientId || !redirectUri) {
+      return c.json({ error: "invalid_request", error_description: "code, code_verifier, client_id, redirect_uri required" }, 400);
+    }
+    const client = store.getOAuthClient(clientId);
+    if (!client) return c.json({ error: "invalid_client" }, 401);
+    // Confidential clients (registered with a secret) must authenticate; public ones must not.
+    if (!clientSecretMatches(get("client_secret"), client.client_secret_hash)) {
+      return c.json({ error: "invalid_client" }, 401);
+    }
+    const ctx = store.takeOAuthCode(code, Date.now()); // one-shot + expiry check inside
+    if (!ctx) return c.json({ error: "invalid_grant", error_description: "code invalid or expired" }, 400);
+    // Re-bind: the code must be redeemed by the same client, for the same redirect, with the matching
+    // PKCE verifier. Any mismatch = reject (the code was already consumed above, so no replay).
+    if (ctx.client_id !== clientId || ctx.redirect_uri !== redirectUri) {
+      return c.json({ error: "invalid_grant" }, 400);
+    }
+    if (!verifyPkceS256(codeVerifier, ctx.code_challenge)) {
+      return c.json({ error: "invalid_grant", error_description: "PKCE verification failed" }, 400);
+    }
+    const accessToken = store.issueConnectorToken(ctx.user_id, client.name ?? "OAuth connector");
+    return c.json({ access_token: accessToken, token_type: "Bearer", scope: "mcp" });
+  });
 
   // Google sign-in (human path). Body: { credential, draft? } where `credential` is the Google ID
   // token from the browser and `draft` is the optional pre-auth localStorage sticky text. On first
@@ -311,4 +492,86 @@ export function createApp({
   }
 
   return app;
+}
+
+// ---- OAuth consent UI (tiny server-rendered pages; no client framework) --------------------------
+// These are the only HTML the AS serves directly. Kept minimal + dependency-free. All interpolation
+// goes through escapeHtml — these pages echo back attacker-controllable query params (client_name,
+// the authorize URL), so escaping is load-bearing, not cosmetic.
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const PAGE_STYLE = `
+  body{font:16px system-ui,sans-serif;background:#faf7f0;color:#2a2a2a;margin:0;
+    display:grid;place-items:center;min-height:100vh}
+  .card{background:#fffdf6;border:1px solid #e8e0cc;border-radius:14px;padding:28px 26px;
+    max-width:360px;box-shadow:0 8px 28px rgba(0,0,0,.06);text-align:center}
+  h1{font-size:19px;margin:0 0 6px}p{color:#6b6552;margin:6px 0 18px;line-height:1.5}
+  button{font:inherit;background:#2a2a2a;color:#fff;border:0;border-radius:9px;
+    padding:11px 20px;cursor:pointer;width:100%}
+  .flower{font-size:34px;line-height:1}.err{color:#a23}`;
+
+function shell(title: string, inner: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)} — Magic Sticky</title><style>${PAGE_STYLE}</style></head>
+<body><div class="card">${inner}</div></body></html>`;
+}
+
+function errorPage(message: string): string {
+  return shell("Error", `<div class="flower">𑁍</div><h1>Couldn’t connect</h1>
+<p class="err">${escapeHtml(message)}</p>`);
+}
+
+// Shown when the human isn't signed in. Renders the GIS button; on credential it POSTs to
+// /auth/google (sets the session cookie) then reloads the SAME authorize URL to resume the flow.
+function signInPage(authorizeUrl: string, googleClientId?: string): string {
+  if (!googleClientId) {
+    return shell("Sign in", `<div class="flower">𑁍</div><h1>Sign in required</h1>
+<p>Sign-in isn’t configured on this server.</p>`);
+  }
+  const safeUrl = escapeHtml(authorizeUrl);
+  return shell(
+    "Sign in",
+    `<div class="flower">𑁍</div><h1>Connect this Claude</h1>
+<p>Sign in with Google to let this Claude read &amp; write your shared sticky.</p>
+<div id="btn"></div>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+  function onCred(r){
+    fetch("/auth/google",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({credential:r.credential})})
+      .then(function(res){ if(res.ok){ location.href=${JSON.stringify(authorizeUrl)}; }
+        else { document.getElementById("btn").innerHTML='<p class="err">Sign-in was rejected.</p>'; }});
+  }
+  function init(){
+    if(!(window.google&&google.accounts&&google.accounts.id)){ return setTimeout(init,120); }
+    google.accounts.id.initialize({client_id:${JSON.stringify(googleClientId)},callback:onCred});
+    google.accounts.id.renderButton(document.getElementById("btn"),{theme:"outline",size:"large"});
+  }
+  init();
+</script>
+<noscript><p>JavaScript is required to sign in.</p><p>${safeUrl}</p></noscript>`,
+  );
+}
+
+// Shown when the human IS signed in. A single "Connect" button POSTs the original authorize params
+// to the approve route, which mints the code and redirects back to the client.
+function consentPage(_authorizeUrl: string, clientName: string, paramsString: string): string {
+  return shell(
+    "Connect",
+    `<div class="flower">𑁍</div><h1>Connect ${escapeHtml(clientName)}?</h1>
+<p>It will be able to read and write your <strong>shared sticky</strong> — the one note every Claude sees.</p>
+<form method="post" action="/oauth/authorize/approve">
+  <input type="hidden" name="params" value="${escapeHtml(paramsString)}">
+  <button type="submit">Connect</button>
+</form>`,
+  );
 }

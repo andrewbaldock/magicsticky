@@ -45,10 +45,21 @@ bun run test:e2e   # Playwright UI E2E on iPhone / Pixel / Desktop
 bun run typecheck  # backend + web/
 ```
 
-## Register the connector in a Claude
-Sign in to the web app → **Connect a Claude** → generate a token → add a custom MCP connector
-pointing at `https://<host>/mcp` with `Authorization: Bearer <token>`. Then call `whoami` first to
-load your shared sticky as context.
+## Connect a Claude
+The whole point: **every** Claude — desktop, phone, Claude Code — can read/write your one shared
+sticky. There are two register paths because the clients differ. See
+[CONNECT-A-CLAUDE.md](./CONNECT-A-CLAUDE.md) for the step-by-step.
+
+- **Desktop / phone / Cowork (OAuth — recommended):** in **Add custom connector**, paste just the
+  URL `https://<host>/mcp` and connect. You'll be sent through Google sign-in + a one-tap consent,
+  then the connector is live. No token to copy — the OAuth flow mints a per-client connector token
+  for you (the server is its own OAuth 2.1 Authorization Server: discovery at
+  `/.well-known/oauth-protected-resource`, PKCE + Dynamic Client Registration).
+- **Claude Code (CLI — static token):** the CLI supports a header, so use `.mcp.json` with
+  `"headers": { "Authorization": "Bearer <token>" }` pointing at `https://<host>/mcp`. Generate the
+  token in the web app → **Connect a Claude**.
+
+Either way, call `whoami` first to load your shared sticky as context.
 
 ## Docs
 - **[docs/architecture.md](./docs/architecture.md)** — architecture reference (+ the draw.io diagram beside it).

@@ -217,6 +217,39 @@ editing. Manifesto-safe because markdown IS plain text; Claude still reads the r
 - Deps: `marked`, `dompurify`. E2E proves a bare URL → clickable `<a rel=noopener>` and that an
   injected `<img onerror>` is sanitized away. NOT rich-text: no toolbar, no WYSIWYG, no stored HTML.
 
+## STATUS (2026-06-18) — step 10 DONE: MCP OAuth (desktop/phone connector unlock)
+The bearer-only `/mcp` blocked desktop/Cowork/phone Claude (their connector dialog has no
+static-header field — OAuth-only). Per Andrew's guiding principle **"ALL CLAUDES CAN SHARE THIS
+PROMPT"**, this is the product's defining promise, so it was promoted to top priority and built.
+Magic Sticky is now its own **minimal OAuth 2.1 Authorization Server** layered on the existing
+Google sign-in:
+- **Spec:** MCP authorization 2025-11-25 — PKCE **S256** (mandatory), RFC 8707 resource indicators,
+  RFC 9728 protected-resource metadata, RFC 8414 AS metadata, RFC 7591 Dynamic Client Registration.
+- **Discovery:** a 401 from `/mcp` now carries `WWW-Authenticate: Bearer resource_metadata="…"`.
+  `GET /.well-known/oauth-protected-resource` + `/.well-known/oauth-authorization-server` advertise
+  the endpoints + `code_challenge_methods_supported:["S256"]`.
+- **Flow:** `POST /oauth/register` (DCR, zero-config) → `GET /oauth/authorize` (reuses the human
+  session; renders a Google sign-in page if not signed in, else a one-tap consent) →
+  `POST /oauth/authorize/approve` (mints a one-shot, TTL-bound code) → `POST /oauth/token`
+  (verifies PKCE + redirect + client, redeems the code) → **returns a per-client connector token as
+  the `access_token`**. That token authenticates `/mcp` through the unchanged bearer middleware.
+- **Token model (decided with Andrew):** the access_token IS a `msk_…` connector token — **no JWTs,
+  no refresh tokens**. New `connector_token` table holds many tokens per account, so EACH Claude that
+  completes OAuth gets its own token, all resolving to the one account (no reconnect logs others out).
+  `resolveConnectorToken` checks both the human one-token `account.connector_token_hash` and this
+  table. Claude Code's static-header path is **unchanged**.
+- **Surface unchanged — prime-directive clean:** still the same 4 MCP tools. This is an auth front
+  door, not a 5th tool. No multi-tenancy (still allowlist single-user); OAuth just lets MORE Claude
+  clients reach the ONE account.
+- **Files:** `src/oauth.ts` (pure AS logic), `/oauth/*` + `/.well-known/*` routes + the 401 header in
+  `src/app.ts`, `oauth_client`/`oauth_code`/`connector_token` tables + methods in `src/db.ts`,
+  `MAGICSTICKY_PUBLIC_URL` wiring in `src/server-http.ts`. Tests: `test/oauth.test.ts` (unit) +
+  `test/oauth-http.test.ts` (over-the-wire discovery → register → authorize → token → /mcp whoami).
+- **New env:** `MAGICSTICKY_PUBLIC_URL` (canonical https origin = OAuth issuer + RFC 8707 resource).
+  The AS enables only when it + `MAGICSTICKY_SESSION_SECRET` + `GOOGLE_CLIENT_ID` are all set.
+- **Deploy note:** set the `MAGICSTICKY_PUBLIC_URL` Fly secret before relying on the OAuth path.
+- Suite after: backend **84/84**, web tsc clean, Playwright **36/36**.
+
 ## Risks
 - **`write` concurrency** is THE risk (two writers on the shared sticky) — mitigated by step-1
   optimistic version + undo. Test it explicitly.
@@ -230,5 +263,7 @@ editing. Manifesto-safe because markdown IS plain text; Claude still reads the r
 
 ## Explicitly NOT in Phase 2 (anti-scope holds)
 Items/sections/status (gone for good), nesting, sharing/read-links, search, rich-text rendering
-engine (autolinking bare URLs is the ONLY render affordance — no markdown/formatting), full
-multi-tenant OAuth/IdP, E2EE, any 5th+ tool without a manifesto check.
+engine (autolinking bare URLs is the ONLY render affordance — no markdown/formatting),
+multi-TENANT OAuth/IdP (the step-10 AS is single-user: it authorizes only allowlisted accounts;
+multi-user is still a config flip, not a built-out IdP), E2EE, any 5th+ tool without a manifesto
+check.

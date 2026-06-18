@@ -3,11 +3,22 @@ import { Plus, Pin, Undo2, Link2, LogOut } from "lucide-react";
 import { api, ApiError, type StickyMeta, type StickyFull } from "./api.ts";
 import { ConnectorSheet } from "./ConnectorSheet.tsx";
 import { StickyEditor } from "./StickyEditor.tsx";
+import { pastelFor } from "./palette.ts";
+import type { CSSProperties } from "react";
+
+// Inline CSS vars for a sticky's pastel color (drives both its tab and, when active, the pane).
+function pastelVars(position: number): CSSProperties {
+  const p = pastelFor(position);
+  return { ["--sticky" as string]: p.fill, ["--sticky-edge" as string]: p.edge };
+}
 
 const MAX_CHARS = 10_000;
 const SAVE_DEBOUNCE_MS = 700;
+const FIRST_RETRY_MS = 3_000; // backoff: 3s → 6s → 12s … capped
+const MAX_RETRY_MS = 30_000;
 
 type SaveState = "idle" | "saving" | "saved" | "conflict" | "error";
+type PendingSave = { next: string; baseVersion: number; id: string };
 
 export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
   const [metas, setMetas] = useState<StickyMeta[]>([]);
@@ -17,6 +28,9 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
   const [save, setSave] = useState<SaveState>("idle");
   const [showToken, setShowToken] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryDelay = useRef(FIRST_RETRY_MS);
+  const pending = useRef<PendingSave | null>(null); // the latest unsaved edit (for retry/online flush)
 
   // Run an async action; on a 401 drop to signed-out, on any other error flag a save error rather
   // than letting the rejection vanish (every handler routes through this).
@@ -63,39 +77,79 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
     };
   }, [activeId, guard]);
 
-  // Debounced optimistic-CAS save. On 409, adopt the latest version and RE-ARM a save so the user's
-  // text actually persists (don't make them type another character to recover).
-  const scheduleSave = useCallback(
+  // Debounced optimistic-CAS save with offline retry. A failed save (no connection / server blip)
+  // does NOT give up — it keeps retrying with backoff until it lands, so edits typed offline sync
+  // when the connection returns. 401 is the exception (auth, not connectivity → sign out).
+  const performSave = useCallback(
+    async (next: string, baseVersion: number, id: string) => {
+      setSave("saving");
+      try {
+        const updated = await api.saveSticky(id, next, baseVersion);
+        pending.current = null;
+        retryDelay.current = FIRST_RETRY_MS;
+        setCurrent(updated);
+        setSave("saved");
+        refreshList(); // nav title (first line) may have changed
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          onSignedOut(); // auth, not connectivity — don't retry
+          return;
+        }
+        if (e instanceof ApiError && e.status === 409) {
+          // someone else wrote since our base version; adopt theirs and re-save our text on top
+          const latest = await api.getSticky(id).catch(() => null);
+          if (latest) {
+            setCurrent(latest);
+            setSave("conflict");
+            if (next !== latest.text) queueSave(next, latest.version, id);
+          }
+          return;
+        }
+        // network / server error → keep the edit queued and retry with backoff
+        pending.current = { next, baseVersion, id };
+        setSave("error");
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => {
+          const p = pending.current;
+          if (p) void performSave(p.next, p.baseVersion, p.id);
+        }, retryDelay.current);
+        retryDelay.current = Math.min(retryDelay.current * 2, MAX_RETRY_MS);
+      }
+    },
+    [refreshList, onSignedOut],
+  );
+
+  // Debounce keystrokes, then perform (which owns retry). Stash the latest pending edit so a retry
+  // or an "online" event always saves the freshest text.
+  const queueSave = useCallback(
     (next: string, baseVersion: number, id: string) => {
+      pending.current = { next, baseVersion, id };
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        guard(async () => {
-          setSave("saving");
-          try {
-            const updated = await api.saveSticky(id, next, baseVersion);
-            setCurrent(updated);
-            setSave("saved");
-            refreshList(); // nav title (first line) may have changed
-          } catch (e) {
-            if (e instanceof ApiError && e.status === 409) {
-              // someone else wrote since our base version; adopt their version and retry our text
-              const latest = await api.getSticky(id);
-              setCurrent(latest);
-              setSave("conflict");
-              if (next !== latest.text) scheduleSave(next, latest.version, id);
-            } else {
-              throw e; // let guard handle 401 / flag error
-            }
-          }
-        });
+        const p = pending.current;
+        if (p) void performSave(p.next, p.baseVersion, p.id);
       }, SAVE_DEBOUNCE_MS);
     },
-    [guard, refreshList],
+    [performSave],
   );
+
+  // When connectivity returns, immediately flush any pending edit instead of waiting out the backoff.
+  useEffect(() => {
+    const onOnline = () => {
+      const p = pending.current;
+      if (p) {
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        retryDelay.current = FIRST_RETRY_MS;
+        void performSave(p.next, p.baseVersion, p.id);
+      }
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [performSave]);
 
   const onChange = (v: string) => {
     setText(v);
-    if (current) scheduleSave(v, current.version, current.id);
+    if (current) queueSave(v, current.version, current.id);
   };
 
   const onAdd = () =>
@@ -131,6 +185,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
     });
 
   const over = text.length > MAX_CHARS;
+  const activeMeta = metas.find((m) => m.id === activeId);
 
   return (
     <div className="app">
@@ -139,6 +194,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
           <button
             key={m.id}
             className={`tab${m.id === activeId ? " active" : ""}`}
+            style={pastelVars(m.position)}
             onClick={() => setActiveId(m.id)}
           >
             {m.is_shared && <span className="shared-dot" aria-label="shared" />}
@@ -150,7 +206,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
         </button>
       </nav>
 
-      <main className="sticky-pane">
+      <main className="sticky-pane" style={activeMeta ? pastelVars(activeMeta.position) : undefined}>
         <div className="sticky-head">
           <button
             className={`lozenge${current?.is_shared ? " is-shared" : ""}`}
@@ -191,7 +247,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
             {save === "saving" && "Saving…"}
             {save === "saved" && "Saved"}
             {save === "conflict" && "Merged a newer version — re-saving…"}
-            {save === "error" && "Couldn’t save — check your connection"}
+            {save === "error" && "Offline — your edits are queued, retrying…"}
           </span>
           {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()}
         </div>

@@ -3,8 +3,8 @@
    hover-only controls; touch targets >= 44px. */
 
 :root {
-  --sticky: #f7d774; /* the sticky-note yellow */
-  --sticky-edge: #e6c24a;
+  --sticky: #fbe7a0; /* sticky-note yellow — lightened + softened (per-sticky colors override this) */
+  --sticky-edge: #ecd486;
   --ink: #2a2a26;
   --muted: #6b6657;
   --bg: #2a2a2e;

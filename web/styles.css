@@ -11,6 +11,7 @@
   --shared: #2e7d52;
   --danger: #b3402f;
   --tap: 44px; /* min touch target */
+  --font-scale: 1; /* device text-size pref (S/M/L) set on <html> by useSettings */
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
@@ -84,7 +85,7 @@ body {
   border: none;
   border-radius: 10px 10px 0 0;
   background: var(--sticky-edge);
-  color: var(--ink);
+  color: var(--sticky-ink, var(--ink));
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
@@ -131,6 +132,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--sticky);
+  color: var(--sticky-ink, var(--ink)); /* flips to light ink in dark mode */
   min-height: 0; /* let the textarea scroll, not the page */
 }
 .sticky-head {
@@ -171,10 +173,11 @@ body {
   gap: 6px;
   min-height: var(--tap);
   padding: 0 14px;
-  border: 1.5px solid rgba(0, 0, 0, 0.25);
+  border: 1.5px solid currentColor;
   border-radius: 999px;
   background: transparent;
-  color: var(--ink);
+  color: var(--sticky-ink, var(--ink));
+  opacity: 0.85;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -187,7 +190,7 @@ body {
   justify-content: center;
   border: none;
   background: transparent;
-  color: var(--ink);
+  color: var(--sticky-ink, var(--ink));
   cursor: pointer;
   border-radius: 8px;
 }
@@ -203,9 +206,10 @@ body {
   outline: none;
   resize: none;
   background: transparent;
-  color: var(--ink);
+  color: var(--sticky-ink, var(--ink)); /* inherits the active sticky's ink (flips in dark mode) */
   font: inherit;
-  font-size: 17px; /* >=16px so iOS doesn't zoom on focus */
+  /* 17px base scaled by the device text-size pref; max() keeps it >=16px so iOS never zooms. */
+  font-size: max(16px, calc(17px * var(--font-scale)));
   line-height: 1.6;
   padding: 16px;
   min-height: 0;
@@ -501,4 +505,70 @@ a {
     margin: 0 auto;
     width: 100%;
   }
+}
+
+/* THEME NOTE: the desk/chrome (--bg, nav, offline bar, sheets) is ALWAYS dark — both themes. The
+   only thing that flips is the STICKY: light mode = light pastel + dark ink (default, the liked
+   look); dark mode = deep pastel + light ink. That flip is driven entirely by the per-sticky
+   --sticky / --sticky-edge / --sticky-ink vars (set inline from palette.ts by theme), so no
+   [data-theme] desk overrides are needed here. */
+
+/* ---- settings panel ---- */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+}
+.settings-label {
+  font-weight: 600;
+  font-size: 15px;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+.seg-btn:first-child {
+  border-left: none;
+}
+.seg-btn.on {
+  background: var(--ink);
+  color: #fff;
+}
+.settings-logout {
+  width: 100%;
+  margin-top: 16px;
+  justify-content: center;
+  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+}
+.theme-toggle {
+  width: var(--tap);
+  height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
 }

@@ -23,6 +23,48 @@ test("signed-out landing shows the draft sticky and a sign-in CTA", async ({ pag
   await expect(page.getByText("Magic Sticky", { exact: false })).toBeVisible();
 });
 
+test("settings: gear opens panel; theme toggle flips data-theme + sticky ink; font size; logout", async ({
+  page,
+}) => {
+  await signIn(page, "a note");
+  await page.goto("/");
+  await page.locator(".editor").waitFor();
+
+  // default theme = light (the liked look)
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+
+  // open settings via the gear
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+
+  // sun/moon toggle → dark; html data-theme flips and the sticky pane goes dark-ink
+  await page.locator(".theme-toggle").click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  // font size: Large bumps the scale var
+  await page.getByRole("button", { name: "Large" }).click();
+  const scale = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--font-scale").trim(),
+  );
+  expect(scale).toBe("1.15");
+
+  // logout from settings → back to the signed-out landing
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByPlaceholder("Type anything…")).toBeVisible();
+});
+
+test("Connect button shows ONLY on the shared sticky", async ({ page }) => {
+  await signIn(page, "shared note");
+  await page.goto("/");
+  await page.locator(".editor").waitFor();
+  // sticky 1 is shared → Connect visible
+  await expect(page.getByRole("button", { name: "Connect a Claude" })).toBeVisible();
+  // add a new (non-shared) sticky → Connect hidden
+  await page.locator(".tab-add").click();
+  await expect(page.locator(".editor")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect a Claude" })).toHaveCount(0);
+});
+
 test("full flow: sign in → sticky-1 titled from draft → edit/counter → add → share → token", async ({
   page,
 }) => {

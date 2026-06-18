@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pin, Undo2, Link2, LogOut } from "lucide-react";
+import { Plus, Pin, Undo2, Link2, Settings } from "lucide-react";
 import { api, ApiError, type StickyMeta, type StickyFull } from "./api.ts";
 import { ConnectorSheet } from "./ConnectorSheet.tsx";
+import { SettingsSheet } from "./SettingsSheet.tsx";
 import { StickyEditor } from "./StickyEditor.tsx";
 import { pastelFor } from "./palette.ts";
 import { OfflinePanel } from "./OfflinePanel.tsx";
 import { nextDelay, classifySaveError } from "./saveRetry.ts";
+import { useSettings, type Theme } from "./useSettings.ts";
 import type { CSSProperties } from "react";
 
-// Inline CSS vars for a sticky's pastel color (drives both its tab and, when active, the pane).
-function pastelVars(position: number): CSSProperties {
-  const p = pastelFor(position);
-  return { ["--sticky" as string]: p.fill, ["--sticky-edge" as string]: p.edge };
+// Inline CSS vars for a sticky's per-note color (tab + pane). In dark mode the sticky inverts to a
+// deep pastel with light ink; the desk/chrome stays dark either way.
+function pastelVars(position: number, theme: Theme): CSSProperties {
+  const p = pastelFor(position, theme);
+  return {
+    ["--sticky" as string]: p.fill,
+    ["--sticky-edge" as string]: p.edge,
+    ["--sticky-ink" as string]: p.ink,
+  };
 }
 
 const MAX_CHARS = 10_000;
@@ -24,11 +31,13 @@ type PendingSave = { next: string; baseVersion: number; id: string };
 
 export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
   const qc = useQueryClient();
+  const { theme } = useSettings();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [current, setCurrent] = useState<StickyFull | null>(null);
   const [text, setText] = useState("");
   const [save, setSave] = useState<SaveState>("idle");
   const [showToken, setShowToken] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [staleNotice, setStaleNotice] = useState(false); // server changed while we were editing
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -232,7 +241,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
           <button
             key={m.id}
             className={`tab${m.id === activeId ? " active" : ""}`}
-            style={pastelVars(m.position)}
+            style={pastelVars(m.position, theme)}
             onClick={() => setActiveId(m.id)}
           >
             {m.is_shared && <span className="shared-dot" aria-label="shared" />}
@@ -244,7 +253,7 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
         </button>
       </nav>
 
-      <main className="sticky-pane" style={activeMeta ? pastelVars(activeMeta.position) : undefined}>
+      <main className="sticky-pane" style={activeMeta ? pastelVars(activeMeta.position, theme) : undefined}>
         <div className="sticky-head">
           <button
             className={`lozenge${current?.is_shared ? " is-shared" : ""}`}
@@ -256,15 +265,18 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
             {current?.is_shared ? "Shared prompt" : "Make shared"}
           </button>
           <span className="head-spacer" />
-          <button className="connect-btn" onClick={() => setShowToken(true)} aria-label="Connect a Claude">
-            <Link2 size={16} />
-            <span>Connect</span>
-          </button>
+          {/* Connect a Claude only makes sense on the SHARED sticky — that's the note Claude reads. */}
+          {current?.is_shared && (
+            <button className="connect-btn" onClick={() => setShowToken(true)} aria-label="Connect a Claude">
+              <Link2 size={16} />
+              <span>Connect</span>
+            </button>
+          )}
           <button className="icon-btn" onClick={onUndo} aria-label="Undo last overwrite" title="Undo">
             <Undo2 size={20} />
           </button>
-          <button className="icon-btn" onClick={onLogout} aria-label="Sign out" title="Sign out">
-            <LogOut size={20} />
+          <button className="icon-btn" onClick={() => setShowSettings(true)} aria-label="Settings" title="Settings">
+            <Settings size={20} />
           </button>
         </div>
 
@@ -299,6 +311,15 @@ export function Workspace({ onSignedOut }: { onSignedOut: () => void }) {
       </main>
 
       {showToken && <ConnectorSheet onClose={() => setShowToken(false)} />}
+      {showSettings && (
+        <SettingsSheet
+          onClose={() => setShowSettings(false)}
+          onLogout={() => {
+            setShowSettings(false);
+            onLogout();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -100,7 +100,7 @@ test("full flow: sign in → sticky-1 titled from draft → edit/counter → add
   // type and see the counter; assert the SETTLED save state (not the transient "Saving…", which a
   // 700ms debounce can flash past faster than the test samples).
   await editor.fill("interview prep — done");
-  await expect(page.locator(".counter")).toContainText("/ 10,000");
+  await expect(page.locator(".counter")).toContainText("/ 100,000");
   await expect(page.locator(".save-state")).toContainText("Saved", { timeout: 5000 });
 
   // add a second sticky → becomes active, untitled

@@ -15,7 +15,7 @@ import { Database } from "bun:sqlite";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import type { Cipher } from "./crypto.ts";
 
-export const MAX_CHARS = 10_000; // per-sticky cap; UI shows a counter, store enforces it
+export const MAX_CHARS = 100_000; // per-sticky cap; UI shows a counter, store enforces it
 // Soft stack cap. INTENTIONALLY enforced in the UI only (creating a sticky is a web action) — the
 // store stays uncapped on count so a future "expand to 20" is a UI change, not a migration.
 export const DEFAULT_STACK_SIZE = 10;

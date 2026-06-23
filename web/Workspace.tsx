@@ -24,7 +24,7 @@ function pastelVars(position: number, theme: Theme): CSSProperties {
   };
 }
 
-const MAX_CHARS = 10_000;
+const MAX_CHARS = 100_000;
 const SAVE_DEBOUNCE_MS = 700;
 // retry backoff/classification live in saveRetry.ts (unit-tested) — see nextDelay/classifySaveError.
 

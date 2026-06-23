@@ -78,6 +78,17 @@ export function createApp({
 }: AppOptions): Hono<{ Variables: Variables }> {
   const app = new Hono<{ Variables: Variables }>();
 
+  // HSTS. Fly's force_https answers plaintext with a 301, but that first hop is still cleartext and
+  // Fly adds no HSTS header — so a browser keeps making the plaintext hop until it's redirected.
+  // Set it here (post-response, so it lands on every route incl. the raw /mcp response) only in prod
+  // over HTTPS; never over http://localhost in dev, where a pin would be wrong. 2yr + preload-ready.
+  if (secureCookie) {
+    app.use("*", async (c, next) => {
+      await next();
+      c.res.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+    });
+  }
+
   // The OAuth AS is enabled only with a public URL + a session signer (it reuses the human session
   // to know WHO is authorizing). Helpers close over these so the routes stay terse.
   const oauthEnabled = !!publicUrl && !!session;

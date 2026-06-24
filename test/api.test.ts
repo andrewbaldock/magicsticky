@@ -116,7 +116,7 @@ test("save over the cap → 413", async () => {
   const res = await fetch(`${base}/api/stickies/${id}`, {
     method: "PUT",
     headers: { cookie, "content-type": "application/json" },
-    body: JSON.stringify({ text: "z".repeat(10_001), version: got.version }),
+    body: JSON.stringify({ text: "z".repeat(100_001), version: got.version }),
   });
   expect(res.status).toBe(413);
 });
